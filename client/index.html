@@ -2,7 +2,7 @@
 <html>
 <head>
 	<link rel="stylesheet" href="style.css" />
-	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js"></script>
+	<script type="text/javascript" src="http://mbostock.github.com/d3/d3.min.js"></script>
 	<script type="text/javascript" src="plugs.js"></script>
 	<script type="text/javascript" src="http://localhost:3050/socket.io/socket.io.js"></script>
 </head>
@@ -50,22 +50,22 @@
 			</g>
 			<g class="players">
 				<g class="team team1">
-					<circle class="player seeker" data-position="seeker" cx="7.8" cy="9"  r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="7.8" cy="11" r="0.7" />
-					<circle class="player beater" data-position="beater" cx="7.8" cy="13" r="0.7" />
-					<circle class="player keeper" data-position="keeper" cx="7.8" cy="15" r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="7.8" cy="17" r="0.7" />
-					<circle class="player beater" data-position="beater" cx="7.8" cy="19" r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="7.8" cy="21" r="0.7" />
+					<circle class="player seeker" data-position="seeker" data-team="1" cx="7.8" cy="9"  r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="1" cx="7.8" cy="11" r="0.7" />
+					<circle class="player beater" data-position="beater" data-team="1" cx="7.8" cy="13" r="0.7" />
+					<circle class="player keeper" data-position="keeper" data-team="1" cx="7.8" cy="15" r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="1" cx="7.8" cy="17" r="0.7" />
+					<circle class="player beater" data-position="beater" data-team="1" cx="7.8" cy="19" r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="1" cx="7.8" cy="21" r="0.7" />
 				</g>
 				<g class="team team2">
-					<circle class="player seeker" data-position="seeker" cx="36.2" cy="9"  r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="36.2" cy="11" r="0.7" />
-					<circle class="player beater" data-position="beater" cx="36.2" cy="13" r="0.7" />
-					<circle class="player keeper" data-position="keeper" cx="36.2" cy="15" r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="36.2" cy="17" r="0.7" />
-					<circle class="player beater" data-position="beater" cx="36.2" cy="19" r="0.7" />
-					<circle class="player chaser" data-position="chaser" cx="36.2" cy="21" r="0.7" />
+					<circle class="player seeker" data-position="seeker" data-team="2" cx="36.2" cy="9"  r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="2" cx="36.2" cy="11" r="0.7" />
+					<circle class="player beater" data-position="beater" data-team="2" cx="36.2" cy="13" r="0.7" />
+					<circle class="player keeper" data-position="keeper" data-team="2" cx="36.2" cy="15" r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="2" cx="36.2" cy="17" r="0.7" />
+					<circle class="player beater" data-position="beater" data-team="2" cx="36.2" cy="19" r="0.7" />
+					<circle class="player chaser" data-position="chaser" data-team="2" cx="36.2" cy="21" r="0.7" />
 				</g>
 			</g>
 		</g>

@@ -10,14 +10,20 @@
 	
 	var Player = Class.extend({
 		init: function(element,idx){
-			this._el = element;
+			this._el = element; //d3 selection
 			this._ball = false;
-			this._position = element.data('position');
-			this._team = (+element.parent().index('.team') ? -1: 1);
+			this._position = element.property('dataset').position;
+			this._team = (element.property('dataset').team==1)? 1 : -1;
 			this._out = false;
 			this._inZone = true;
 			
-			element.data('idx',idx)
+			element.map(function(d,i){ 
+				if(typeof(d)==='undefined'){
+					d = {};
+				}
+				d.idx=idx;
+				return d;
+			});
 		},
 		motion: {},
 		move: function(pos){
@@ -96,16 +102,11 @@
 			}
 			var flashOn = false,
 				flashTime = setInterval(function(){
-					if (flashOn){
-						t._el.attr('class',t._el.attr('class').replace(/\bflash\b/gi,''));
-						flashOn = false;
-					} else {
-						t._el.attr('class', t._el.attr('class') + ' flash');
-						flashOn = true;
-					}
+					flashOn = !flashOn;
+					t._el.classed('flash',flashOn)
 				},100);
-			setTimeout(function(){ clearInterval(flashTime); t._el.attr('class',t._el.attr('class').replace(/\bflash\b/gi,'')); },600)
-			setTimeout(function(){ t._el.attr('class',t._el.attr('class').replace(/\bout\b/gi,'')); t._out=false;  },6000);
+			setTimeout(function(){ clearInterval(flashTime); t._el.classed('flash',false); },600);
+			setTimeout(function(){ t._el.classed('out',false); t._out=false;  },6000);
 		}
 	}),
 	Ball = Class.extend({
@@ -130,7 +131,7 @@
 				step = { x: Math.abs(val.x-start.x)/iters, y: (val.y-start.y)/iters};
 			if (from==me){
 				sock.send(JSON.stringify({t:'toss', 
-						   d: {id: from._el.attr('data-uid'), x: n.x, y:n.y }}));
+						   d: {id: from._el.property('dataset').uid, x: n.x, y:n.y }}));
 			}
 			this._attached = false;
 			thisBall._el.attr('cx',start.x).attr('cy',start.y);
@@ -161,10 +162,13 @@
 			r2 = +el2._el.attr('r');
 		return !!(Math.sqrt(( x2-x1 ) * ( x2-x1 )  + ( y2-y1 ) * ( y2-y1 ) ) <= ( r1 + r2 ));
 	}
-	function newPlayer(d){
-		console.log('new player! ' +JSON.stringify(d));
-		var el = $('.team'+d.t+' .'+posMap[d.p]+':not(.controlled)').eq(0);
-		el.attr('class',el.attr('class')+' controlled').attr('data-uid',d.id);
+	function newPlayer(p){
+		console.log('new player! ' +JSON.stringify(p));
+		var el = d3.select('.team'+p.t+' .'+posMap[p.p]+':not(.controlled)'); //select only selects first match (versus selectAll)
+		el.classed('controlled',true).property('dataset').uid = p.id;
+	}
+	function playerById(id){
+		return players[d3.selectAll('.player').filter(function(d,i){ return (this.dataset.uid == id); })[0][0].__data__.idx];
 	}
 	
 		var t0 = new Date();
@@ -178,30 +182,38 @@
 				PLAYER MOTION
 			*/
 			var cur = { x: +me._el.attr('cx'), y: +me._el.attr('cy') },
-				position = '.'+me._el.data('position').toLowerCase();
+				position = '.'+me._el.property('dataset').position.toLowerCase();
 			if (position == '.keeper' || position == '.chaser'){
 				position = '.keeper:not(.me):not(.out), .chaser'
 			}
-			var collidables = $(position+':not(.me):not(.out)');	
+			var collidables = d3.selectAll(position+':not(.me):not(.out)');	
 			for (var direction in me.motion){
 				if (me.motion[direction]){							
 					me.travel(direction);
 				}
 			}
-			for (var i=0, l=collidables.length; i<l; i++){
-				if (collision(me,{_el: $(collidables[i])})){
+			for (var i=0, l=collidables[0].length; i<l; i++){
+				if (collision(me,{_el: d3.select(collidables[0][i])})){
 					me._el.attr('cx',cur.x).attr('cy',cur.y);
 					break;
 				}
 			}
 			if (+me._el.attr('cx') != cur.x || +me._el.attr('cy') != cur.y){
+				var x, y, id;
+				
 				sock.send(JSON.stringify({t:'move', 
-						   d: {x:+me._el.attr('cx'), y:+me._el.attr('cy'), id:me._el.attr('data-uid')}}));
+						   d: {x:+me._el.attr('cx'), y:+me._el.attr('cy'), id:me._el.property('dataset').uid }}));
 				if (me._ball !== false){
-					var el = me._ball._el;
+					var el = me._ball._el,
+						cl = el.attr('class'),
+						idx;
+					d3.selectAll(cl).each(function(d,i){
+						if (this[0][0] == el[0][0]){
+							idx = i;
+						}
+					})
 					sock.send(JSON.stringify({t:'ballmove', 
-							   d: {b: el.attr('class').charAt(0), i: el.index('.'+el.attr('class')), x:el.attr('cx'), y:el.attr('cy')  }}));
-
+							   d: {b: cl.charAt(0), i: idx, x:el.attr('cx'), y:el.attr('cy')  }}));
 				}
 			}
 			
@@ -282,13 +294,14 @@
 	
 	
 	function init(d){
-		var el = $('.team'+d.t+' .'+posMap[d.p]+':not(.controlled)').eq(0);
+		var el = d3.select('.team'+d.t+' .'+posMap[d.p]+':not(.controlled)');
 			
-		me = players[el.data('idx')];
-		el.attr('class',el.attr('class')+' me').attr('data-uid',d.id);
+		me = players[el[0][0].__data__.idx];
+		el.classed('me',true).property('dataset').uid = d.id;
 		
-		$(document).keydown(function(e){
-			var arrow = key.arrow;
+		d3.select(document).on('keydown', function(){
+			var e = d3.event,
+				arrow = key.arrow;
 		    switch (e.keyCode){
 		    	case arrow.left:
 		    	case arrow.right:
@@ -304,8 +317,9 @@
 		    		return true;
 		    }
 		});
-		$(document).keyup(function(e){
-			var arrow = key.arrow;
+		d3.select(document).on('keyup',function(){
+			var e = d3.event,
+				arrow = key.arrow;
 			 switch (e.keyCode){
 		    	case arrow.left:
 		    	case arrow.right:
@@ -324,18 +338,18 @@
 		});
 		gameLoop()
 	}
-	var quaf = new Quaffle($('.quaffle')),
-		snitch = new Snitch($('.snitch')),
+	var quaf = new Quaffle(d3.select('.quaffle')),
+		snitch = new Snitch(d3.select('.snitch')),
 		bludgers = [],
 		players = [],
 		me,
 		dispatch = {}
 		game=true;
-	$('.bludger').each(function(){
-		bludgers.push(new Bludger($(this)));
+	d3.selectAll('.bludger').each(function(){
+		bludgers.push(new Bludger(d3.select(this)));
 	});
-	$('.player').each(function(idx){
-		players.push(new Player($(this),idx));
+	d3.selectAll('.player').each(function(d,idx){
+		players.push(new Player(d3.select(this),idx));
 	})
 		
 	
@@ -365,16 +379,16 @@
 		}
 	};
 	dispatch.mv = function(d){	//movement
-		players[$('.player[data-uid='+d.id+']').data('idx')].move(d);
+		playerById(d.id).move(d);
 	};
 	dispatch.throw = function(d){	//
-		var p = players[$('.player[data-uid='+d.id+']').data('idx')]
+		var p = playerById(d.id);
 		if (p !== false){
 			p.toss(d.x,d.y);
 		}
 	};
 	dispatch.bmv = function(d){
-		$('.'+ballMap[d.b]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
+		d3.select('.'+ballMap[d.b]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
 	};
 	
 })();
