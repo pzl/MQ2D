@@ -6,14 +6,26 @@
 				},
 		posMap = {c: 'chaser', b:'beater', k: 'keeper', s: 'seeker'},
 		ballMap = {q: 'quaffle', s: 'snitch', b:'bludger'},
-		game = {};
+		sock,
+		game = {},
+		quaf,
+		snitch,
+		bludgers = [],
+		players = [],
+		me,
+		dispatch = {};
+		
+	
+	function send(msg){
+		sock.send(JSON.stringify(msg));
+	}
 	
 	var Player = Class.extend({
 		init: function(element,idx){
 			this._el = element; //d3 selection
 			this._ball = false;
 			this._position = element.property('dataset').position;
-			this._team = (element.property('dataset').team==1)? 1 : -1;
+			this._team = element.property('dataset').team;
 			this._out = false;
 			this._inZone = true;
 			
@@ -29,15 +41,16 @@
 		move: function(pos){
 			var p = this._el,
 				b = this._ball,
-				r = +p.attr('r');
+				r = +p.attr('r'),
+				dir = (this._team==0)? 1: -1;
 								
 			p.attr('cx',pos.x).attr('cy',pos.y);
 			if (b){
 				b = this._ball._el;
-				b.attr('cy',pos.y+this._team*r*0.8);
-				b.attr('cx',pos.x+this._team*r*0.8);
+				b.attr('cy',pos.y+dir*r*0.8);
+				b.attr('cx',pos.x+dir*r*0.8);
 			}
-			if (this._team == 1){
+			if (this._team == 0){
 				if (+pos.x < 11){
 					this._inZone = true;
 				} else {
@@ -77,6 +90,7 @@
 			this.move(newpos);
 		},
 		pickup: function(ball){
+			var dir = dir = (this._team==0)? 1: -1;
 			if (ball._motion !== false){
 				clearInterval(ball._motion.intvl)
 				ball._motion = false;
@@ -84,8 +98,8 @@
 			ball._attached = this;
 			this._ball = ball;
 			var p = this._el;
-			ball._el.attr('cy',parseFloat(p.attr('cy'))+this._team*parseFloat(p.attr('r'))*0.8)
-			ball._el.attr('cx',parseFloat(p.attr('cx'))+this._team*parseFloat(p.attr('r'))*0.8)
+			ball._el.attr('cy',parseFloat(p.attr('cy'))+dir*parseFloat(p.attr('r'))*0.8)
+			ball._el.attr('cx',parseFloat(p.attr('cx'))+dir*parseFloat(p.attr('r'))*0.8)
 		},
 		toss: function(x, y){
 			var ball = this._ball;
@@ -121,21 +135,26 @@
 		toss: function(from, x, y){
 			var thisBall = this,
 				time = 150,
+				dir = dir = (from._team==0)? 1: -1,
 				fps = 1000/60
-				n = { x: (x || from._team*~~(Math.random()*6)+2), y: (y || ~~(Math.random()*4)-2)},
+				n = { x: (x || dir*~~(Math.random()*6)+2), y: (y || ~~(Math.random()*4)-2)},
 				current = { x: +this._el.attr('cx'), y: +this._el.attr('cy')},
-				start = { x: current.x+from._team*2*parseInt(this._el.attr('r'))+n.x*0.2, y: current.y+n.y*0.1 },
+				start = { x: current.x+dir*2*parseInt(this._el.attr('r'))+n.x*0.2, y: current.y+n.y*0.1 },
 				val = { x: current.x+n.x*1.2, y: current.y+n.y },
 				iters = time/fps,
 				i=1,
 				step = { x: Math.abs(val.x-start.x)/iters, y: (val.y-start.y)/iters};
+				console.log(current);
+				console.log(start);
+				console.log(val);
+				console.log(step);
 			if (from==me){
-				sock.send(JSON.stringify({t:'toss', 
-						   d: {id: from._el.property('dataset').uid, x: n.x, y:n.y }}));
+				send({t:'toss', 
+						   d: {id: from._el.property('dataset').uid, x: n.x, y:n.y }});
 			}
 			this._attached = false;
 			thisBall._el.attr('cx',start.x).attr('cy',start.y);
-			this._motion = {intvl: setInterval(function(){ thisBall._el.attr('cx',start.x+from._team*i*step.x).attr('cy',start.y+(i++)*step.y);  },fps),
+			this._motion = {intvl: setInterval(function(){ thisBall._el.attr('cx',start.x+dir*i*step.x).attr('cy',start.y+(i++)*step.y);  },fps),
 							from: from} ;
 			setTimeout(function(){ clearInterval(thisBall._motion.intvl); thisBall._motion=false;  },time);
 		}
@@ -164,15 +183,25 @@
 	}
 	function newPlayer(p){
 		console.log('new player! ' +JSON.stringify(p));
-		var el = d3.select('.team'+p.t+' .'+posMap[p.p]+':not(.controlled)'); //select only selects first match (versus selectAll)
-		el.classed('controlled',true).property('dataset').uid = p.id;
+		var el = d3.select('.team'+p.t+' .'+posMap[p.p]+':eq('+p.i+'):not(.controlled)'); //select only selects first match (versus selectAll)
+		el.classed('controlled',true)//.property('dataset').uid = p.id;
 	}
 	function playerById(id){
 		return players[d3.selectAll('.player').filter(function(d,i){ return (this.dataset.uid == id); })[0][0].__data__.idx];
 	}
+	function getIndex(el,selector){
+		var idx=null;
+		d3.selectAll(selector).each(function(d,i){
+			if (el==this){
+				idx=i;
+				return;
+			}
+		});
+		return idx;
+	}
 	
 		var t0 = new Date();
-	function gameLoop(){
+	function moveLoop(){
 			//var t1 = new Date(),
 			//	obs = ~~(1000/(t1-t0));
 			//t0 = t1;
@@ -201,19 +230,14 @@
 			if (+me._el.attr('cx') != cur.x || +me._el.attr('cy') != cur.y){
 				var x, y, id;
 				
-				sock.send(JSON.stringify({t:'move', 
-						   d: {x:+me._el.attr('cx'), y:+me._el.attr('cy'), id:me._el.property('dataset').uid }}));
+				send({t:'move', 
+						   d: {x:+me._el.attr('cx'), y:+me._el.attr('cy'), id:me._el.property('dataset').uid }});
 				if (me._ball !== false){
 					var el = me._ball._el,
 						cl = el.attr('class'),
-						idx;
-					d3.selectAll(cl).each(function(d,i){
-						if (this[0][0] == el[0][0]){
-							idx = i;
-						}
-					})
-					sock.send(JSON.stringify({t:'ballmove', 
-							   d: {b: cl.charAt(0), i: idx, x:el.attr('cx'), y:el.attr('cy')  }}));
+						idx = getIndex(el[0][0],'.'+cl);
+					send({t:'ballmove', 
+							   d: {b: cl.charAt(0), i: idx, x:el.attr('cx'), y:el.attr('cy')  }});
 				}
 			}
 			
@@ -288,16 +312,32 @@
 				
 			}
 		if (game){
-			window.requestAnimFrame(gameLoop);
+			window.requestAnimFrame(moveLoop);
 		}
 	}
 	
 	
-	function init(d){
-		var el = d3.select('.team'+d.t+' .'+posMap[d.p]+':not(.controlled)');
-			
+	
+	function init(){
+		d3.selectAll('.player:not(.controlled)').on('click',function(){
+			var el = d3.select(this),
+				data = el.property('dataset');
+			d3.selectAll('.player:not(.controlled)').on('click',false);
+			if (typeof io !=='undefined'){
+				var m = {
+						p:data.position.charAt(0),
+						t:data.team,
+						i:getIndex(el[0][0],'.team'+data.team+' .'+data.position)
+					};
+				send({t: 'claim', d: m});
+			} else {
+				run(el); //play around with it when the server's down
+			}
+		})
+	}
+	function run(el){
 		me = players[el[0][0].__data__.idx];
-		el.classed('me',true).property('dataset').uid = d.id;
+		el.classed('me',true);
 		
 		d3.select(document).on('keydown', function(){
 			var e = d3.event,
@@ -336,59 +376,75 @@
 		    		return true;
 		    }
 		});
-		gameLoop()
+		moveLoop();
 	}
-	var quaf = new Quaffle(d3.select('.quaffle')),
-		snitch = new Snitch(d3.select('.snitch')),
-		bludgers = [],
-		players = [],
-		me,
-		dispatch = {}
-		game=true;
+	
+
+
+
+	quaf = new Quaffle(d3.select('.quaffle'));
+	snitch = new Snitch(d3.select('.snitch'));
 	d3.selectAll('.bludger').each(function(){
 		bludgers.push(new Bludger(d3.select(this)));
 	});
-	d3.selectAll('.player').each(function(d,idx){
-		players.push(new Player(d3.select(this),idx));
+	d3.selectAll('.player').each(function(d,i){
+		players.push(new Player(d3.select(this),i));
 	})
 		
 	
-	var sock = io.connect('/',{port: 3050});
-	sock.on('message',function(d){
-		d = JSON.parse(d);
-		console.log('msg: '+JSON.stringify(d));
-		if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
-			dispatch[d.t].call(sock,d.d);
-		}
-	});
-	dispatch.welcome = function(d){
-		if (d==='full'){
-			alert('all positions have been full, please wait for an open match')
+	
+	if (typeof io === 'undefined'){
+		alert('Game server currently down :[   Sorry!');
+		sock = { send: function(){} }; //server's down, we know, just swallow further errors
+		init();
+	} else {
+		sock = io.connect('/',{port: 3050});
+		sock.on('message',function(d){
+			d = JSON.parse(d);
+			console.log('msg: '+JSON.stringify(d));
+			if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
+				dispatch[d.t](d.d);
+			}
+		});
+	}
+	
+	
+	dispatch.w = function(d){ //welcome
+		if (d=='f'){
+			alert('all positions have been chosen, please wait for an open match');
 		} else {
-			init(d);
+			init();
+		}
+	};
+	dispatch.ca = function(d){ //claim answer
+		if (d.a==1){
+			console.log('.team'+d.t+' .'+posMap[d.p]+':eq('+d.i+')');
+			run(d3.select('.team'+d.t+' .'+posMap[d.p]+':eq('+d.i+')'));
+		} else if (d.a==0){
+			alert('Woops! that position is taken, please pick again');
+			init();
+		} else {
+			this.w('f');
 		}
 	};
 	dispatch.np = function(d){ //new player
 		var el;
-		if (d instanceof Array){
-			for (var i=0, l=d.length; i<l; i++){
-				newPlayer(d[i]);
-			}
-		} else {
-			newPlayer(d);
+		for (var i=0, l=d.length; i<l; i++){
+			newPlayer(d[i]);
 		}
 	};
-	dispatch.mv = function(d){	//movement
-		playerById(d.id).move(d);
+	dispatch.mv = function(d){ //move
+		d3.select('.team'+d.t+' .'+posMap[d.p]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
+		//playerById(d.id).move(d);
 	};
-	dispatch.throw = function(d){	//
+	dispatch.t = function(d){ //throw
 		var p = playerById(d.id);
 		if (p !== false){
 			p.toss(d.x,d.y);
 		}
 	};
 	dispatch.bmv = function(d){
-		d3.select('.'+ballMap[d.b]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
+		d3.selectAll('.'+ballMap[d.b]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
 	};
 	
 })();

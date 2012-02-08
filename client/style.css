@@ -105,15 +105,20 @@
 			stroke-width: 0.1;
 		}
 		
-		.team1 {
+		.team0, .team0 .controlled, .team0 .me {
 			fill: red;
 		}
-		.team2 {
+		.team1, .team1 .controlled, .team1 .me {
 			fill: blue;
 		}
 		
 		.player {
 			stroke-width:0.1;
+			stroke-dasharray: 0.4 0.2;
+			fill: rgba(80,80,80,0.5);
+		}
+		.player.controlled, .player.me {
+			stroke-dasharray: none;
 		}
 		.beater {
 			stroke: black;
