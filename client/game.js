@@ -1,12 +1,6 @@
 (function(){
-	var key = { 
-					arrow:{left: 37, up: 38, right: 39, down: 40 }, 
-					wasd: { left: 65, up: 87, right: 68, down: 83}, 
-					space: 32, 1: 49, 2: 50, 3:51, 4:52, 5:53, 6:54, 7:55 
-				},
-		posMap = {c: 'chaser', b:'beater', k: 'keeper', s: 'seeker'},
+		var posMap = {c: 'chaser', b:'beater', k: 'keeper', s: 'seeker'},
 		ballMap = {q: 'quaffle', s: 'snitch', b:'bludger'},
-		sock,
 		game = {},
 		quaf,
 		snitch,
@@ -14,11 +8,432 @@
 		players = [],
 		me,
 		dispatch = {};
+	
+	
+	var Keyboard = function(){
+		var key = { 
+					arrow:{left: 37, up: 38, right: 39, down: 40 }, 
+					wasd: { left: 65, up: 87, right: 68, down: 83}, 
+					space: 32, 1: 49, 2: 50, 3:51, 4:52, 5:53, 6:54, 7:55 
+				},
+			right=0,
+			left=0,
+			up=0,
+			left=0,
+			fire=false;
+		d3.select(document).on('keydown', function(){
+			var e = d3.event,
+				prevent=false,
+				arrow = key.arrow;
+		    switch (e.keyCode){
+		    	case arrow.left:
+		    		left=1;
+		    		prevent=true;
+		    		break;
+		    	case arrow.right:
+		    		right=1;
+		    		prevent=true;
+		    		break;
+		    	case arrow.up:
+		    		up=1;
+		    		prevent=true;
+		    		break;
+		    	case arrow.down:
+		    		down=1;
+		    		prevent=true;
+		    		break;
+		    	case key.space:
+		    		fire=true;
+		    		prevent=true;
+		    		break;
+		    }
+		    if (prevent){
+		   		e.preventDefault();
+		   	}
+		});
+		d3.select(document).on('keyup',function(){
+			var e = d3.event,
+				prevent=false,
+				arrow = key.arrow;
+		    switch (e.keyCode){
+		    	case arrow.left:
+		    		left=0;
+		    		prevent=true;
+		    		break;
+		    	case arrow.right:
+		    		right=0;
+		    		prevent=true;
+		    		break;
+		    	case arrow.up:
+		    		up=0;
+		    		prevent=true;
+		    		break;
+		    	case arrow.down:
+		    		down=0;
+		    		prevent=true;
+		    		break;
+		    }
+		    if (prevent){
+		   		e.preventDefault();
+		   	}
+		});
+		return {
+			getInputs: function(){
+				return [right-left,down-up];
+			}
+		}
+	},
+	Touch = function(){
+		var tstart,
+			tmove,
+			tstop,
+			lStick = {
+				id: -1,
+				start: [0,0],
+				cur: [0,0]
+			};		
+		tstart = function(e){
+			if (!~lStick.id){
+				var width = window.innerWidth || document.documentElement.offsetWidth;
+				for (var i=0, l=e.changedTouches.length; i<l; i++){
+					if (e.changedTouches[i].clientX <= width/2){
+						lStick.id = e.changedTouches[i].identifier;
+						lStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+						lStick.cur = lStick.start;
+						break;
+					}
+				}
+			}
+
+		};
+		tmove = function(e){
+			if (!!~lStick.id){
+				for (var i=0, l=e.changedTouches.length; i<l; i++){
+					if (e.changedTouches[i].identifier == lStick.id){
+						lStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+						break;
+					}
+				}
+			}
+			e.preventDefault();
+		};		
+		tstop = function(e){
+			lStick.id=-1;
+			lStick.start =[0,0];
+			lStick.cur = lStick.start;
+		};
+	
+		document.addEventListener('touchstart',tstart);
+		document.addEventListener('touchmove',tmove);
+		document.addEventListener('touchend',tstop);
+		document.addEventListener('touchcancel',tstop);
+		
+		return {
+			getInputs: function(){
+				if (!~lStick.id){
+					return [0,0];
+				} else {
+					return [lStick.cur[0]-lStick.start[0],lStick.cur[1]-lStick.start[1]];
+				}
+			}
+		}
+	},
+	InputManager = function(override){
+		var manager;
+		
+		if (typeof override === 'function'){
+			manager=override();
+		} else if ('ontouchstart' in window){ //touch device
+			manager=Touch();
+		} else { //let's hope you have a keyboard!
+			manager=Keyboard();
+		}
+		//Interface
+		return {
+			
+			getInputs: function(){ return manager.getInputs(); }//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
+		}
+	}();
+	
+	
+	
+	
+	var SVGisCoolforHavingaDOM = function(){
+		var svg = d3.select('#game').append('svg').attr('height','99%').attr('width','100%'),
+			game = svg.append('g').attr('transform','scale(15)'),
+			balls =[],
+			players = [];		
+
+		function makeDup(pitchLength,distance){
+			if (typeof distance === 'undefined'){
+				return function(dist){
+					return [0+dist,pitchLength-dist];
+				}
+			}
+			return [0+distance,pitchLength-distance];
+		}
+		
+		return {
+			init: function(start){
+				var field = start.field,
+					state = start.state,
+					x = field.bounds[0]/2,
+					y = field.bounds[1]/2,
+					dup = makeDup(field.bounds[0]);
+					zones = dup(field.keepZone),
+					starts = dup(field.playerStart),
+					glines = dup(field.goalLine),
+					hoops = [],
+					f = game.append('g').attr('id','field').attr('clip-path','url(#fieldClip)');
+				R = field.R;
+				for (var i=0, l=field.goals.length; i<l; i++){
+					hoops.push({x:glines[0],y:field.goals[i]});
+					hoops.push({x:glines[1],y:field.goals[i]});
+				}
+				ballG = game.append('g').attr('id','balls');
+				playG = game.append('g').attr('id','players');
+				
+				
+				//field clipper
+				svg.append('defs').append('clipPath')
+					.attr('id','fieldClip')
+						.append('ellipse').attr('cx',x).attr('rx',x).attr('cy',y).attr('ry',y);
+				
+				f.append('ellipse').attr('cx',x).attr('rx',x).attr('cy',y).attr('ry',y).attr('class','field');
+				f.append('line').classed('mid',true).attr('x1',x).attr('x2',x).attr('y1',0).attr('y2',field.bounds[1]);
+				f.append('circle').classed('center',true).attr('cx',x).attr('cy',y).attr('r',0.6);
+				
+				
+				//mirrored lines and goals
+				f.selectAll('.zone')
+					.data(zones)
+					.enter()
+					.append('rect')
+						.classed('zone',true)
+						.classed('team0',function(d,i){ return i==0 })
+						.classed('team1',function(d,i){ return i==1 })
+						.attr('x',function(d,i){ return ((i)? d : i); })
+						.attr('y',0)
+						.attr('width',function(d,i){ return field.keepZone })
+						.attr('height',field.bounds[0]);	
+				f.selectAll('.zoneLine')
+					.data(zones)
+					.enter()
+					.append('line')
+						.classed('zoneLine',true)
+						.attr('x1',function(d){ return d; })
+						.attr('x2',function(d){ return d; })
+						.attr('y1',0)
+						.attr('y2',field.bounds[0]);
+				f.selectAll('.start')
+					.data(starts)
+					.enter()
+					.append('line')
+						.classed('start',true)
+						.attr('x1',function(d){ return d; })
+						.attr('x2',function(d){ return d; })
+						.attr('y1',0)
+						.attr('y2',field.bounds[0]);
+				f.selectAll('.goal')
+					.data(glines)
+					.enter()
+					.append('line')
+						.classed('goal',true)
+						.attr('x1',function(d){ return d; })
+						.attr('x2',function(d){ return d; })
+						.attr('y1',0)
+						.attr('y2',field.bounds[0]);
+				f.selectAll('.hoop')
+					.data(hoops)
+					.enter()
+					.append('ellipse')
+						.classed('hoop',true)
+						.attr('rx',0.1)
+						.attr('ry',field.goalDiam/2)
+						.attr('cx',function(d){ return d.x })
+						.attr('cy',function(d){ return d.y });
+			
+			ballG.selectAll('circle')
+					.data(state.b)
+					.enter()
+					.append('circle')
+					.attr('r',function(d,i){
+						if (i==0){
+							return R[1];
+						} else if (i<4){
+							return R[2];
+						} else {
+							return R[3];
+						}
+					})
+					.attr('class',function(d,i){
+						if (i==0){
+							return 'quaffle';
+						} else if (i<4){
+							return 'bludger';
+						} else {
+							return 'snitch';
+						}
+					})
+					.attr('cx',function(d){ return d[0] })
+					.attr('cy',function(d){ return d[1] });
+			
+				
+
+			},
+			display: function(state){
+				
+			}
+		}
+	},
+	Renderer = function(override){	//can add Canvas, or HTML+CSS later
+		var manager;
+		if (typeof override =='function'){
+			manager=override();
+		} else {
+			manager=SVGisCoolforHavingaDOM();
+		}
+		
+		//Interface
+		return {
+			init: function(field){ return manager.init(field); }, //draw field and initial state
+			display: function(state){ return manager.display(state); }
+		}
+	}();
+	
+	
+	
+	var Network = function(){
+		var sock,
+			dispatch = {};
+		if (typeof io !== 'undefined'){
+			sock = io.connect('/',{port: 3050});
+			sock.on('message',function(d){
+				console.log('msg: '+d);
+				d = JSON.parse(d);
+				if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
+					dispatch[d.t](d.d);
+				}
+			});
+			return {
+				connected: true,
+				send: function(m){
+					sock.send(JSON.stringify(m));
+				},
+				on: function(evt,cb){
+					dispatch[evt] = cb;
+					return this;
+				}
+			}
+		} else {
+			alert('Gamer server currently down');
+			return {
+				connected: false,
+				send: function(){},
+				on: function(){ return this; }
+			}
+		}
+	};
+	
+	var Engine = function(){
+		var defState = {
+				b: [
+					[22,13.5], //quaffle
+					[22,16.5], //bludger
+					[22,7.5],
+					[22,22.5],
+					[22,15] //snitch
+				],
+				p: {
+				}
+			},
+			curState = {
+				
+			},
+			Ball = function(){
+				
+			}
+		
+		function expand(s){
+		
+		}
+		
+		return {
+			init: function(){
+				var that=this;
+				this.reset();
+				return {
+						field: {
+							bounds: [44,30], //44m by 30m ellipse
+							keepZone: 11, //distance from edge
+							playerStart: 7.8,
+							goalLine: 5.5,
+							goals: [12.7,15,17.3], //y position along the goal line
+							goalHeights: [0.9,1.8,1.4],	//heights, in order
+							goalDiam: 1,
+							R:[0.7, 0.4, 0.3, 0.1] //Radius of [player,quaffle,bludger,snitch]
+						},
+						state: that.getState()
+					};
+			},
+			reset: function(){ //initial state
+				curState = copy(defState);
+				return this.getState();
+			},
+			apply: function(input){ //input is force changes on object
+			
+			
+				return this.getState();	
+			},
+			setState: function(newState){
+				curState = expand(newState);
+				return this.getState();
+			},
+			getState: function(){
+				
+			}
+		}
+	}();
+	
+	var Controller = function(){
+		Renderer.init(Engine.init());
+		Network = Network();
+		Network.on('w',function(d){ //welcome
+				if (d=='f'){
+					alert('This game is currently full! You can watch until the next game begins, though!')
+				} else {
+					//can pick
+				}
+			})
+			.on('s',function(d){ //state
+				Renderer.display(Engine.setState(d));
+			})
+			.on('ca',function(d){ //claim answer
+			
+			})
+			.on('np',function(d){ //new player(s)
+			
+			})
+			.on('b',function(d){ //ball action (not movement)
+			
+			});
 		
 	
-	function send(msg){
-		sock.send(JSON.stringify(msg));
-	}
+		function loop(){
+			var velo = InputManager.getInputs(),
+				state = Engine.apply(velo);
+			Renderer.display(state);
+			window.requestAnimFrame(loop);
+		}
+		
+		return {
+			start: function(){
+				Renderer.display(Engine.reset());
+				loop();
+			}
+		}
+	}();
+	
 	
 	var Player = Class.extend({
 		init: function(element,idx){
@@ -339,43 +754,6 @@
 		me = players[el[0][0].__data__.idx];
 		el.classed('me',true);
 		
-		d3.select(document).on('keydown', function(){
-			var e = d3.event,
-				arrow = key.arrow;
-		    switch (e.keyCode){
-		    	case arrow.left:
-		    	case arrow.right:
-		    	case arrow.up:
-		    	case arrow.down:
-		    		if (!me.motion[e.keyCode]){
-		    			me.motion[e.keyCode] = true;
-		    		}
-		    		return false;
-		    	case key.space:
-		    		return false;
-		    	default:
-		    		return true;
-		    }
-		});
-		d3.select(document).on('keyup',function(){
-			var e = d3.event,
-				arrow = key.arrow;
-			 switch (e.keyCode){
-		    	case arrow.left:
-		    	case arrow.right:
-		    	case arrow.up:
-		    	case arrow.down:
-		    		me.motion[e.keyCode] = false;
-		    		return false;
-		    	case key.space:
-		    		if (me._ball !== false && me._ball.attached() !== false){
-		    			me.toss();
-		    		}
-		    		return false;
-		    	default:
-		    		return true;
-		    }
-		});
 		moveLoop();
 	}
 	
@@ -390,32 +768,9 @@
 	d3.selectAll('.player').each(function(d,i){
 		players.push(new Player(d3.select(this),i));
 	})
-		
 	
 	
-	if (typeof io === 'undefined'){
-		alert('Game server currently down :[   Sorry!');
-		sock = { send: function(){} }; //server's down, we know, just swallow further errors
-		init();
-	} else {
-		sock = io.connect('/',{port: 3050});
-		sock.on('message',function(d){
-			d = JSON.parse(d);
-			console.log('msg: '+JSON.stringify(d));
-			if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
-				dispatch[d.t](d.d);
-			}
-		});
-	}
-	
-	
-	dispatch.w = function(d){ //welcome
-		if (d=='f'){
-			alert('all positions have been chosen, please wait for an open match');
-		} else {
-			init();
-		}
-	};
+
 	dispatch.ca = function(d){ //claim answer
 		if (d.a==1){
 			console.log('.team'+d.t+' .'+posMap[d.p]+':eq('+d.i+')');
