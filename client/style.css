@@ -46,6 +46,40 @@
 			border-collapse: collapse;
 			border-spacing: 0;
 		}
+		
+		#game,body,html {
+			height: 100%;
+		}
+		
+		
+		
+		/* Touch joysticks */
+		canvas {
+			position: absolute;
+			display: block;
+		}
+		
+		.joysticks {
+			width: auto;
+			position: absolute;
+			top:0;
+			left:0;
+			z-index: 99;
+		}
+		
+		
+		
+		/* Canvas order */
+		#movement {
+			z-index: 3;
+		}
+		#pitch {
+			z-index: 1;
+		}
+		
+		
+		
+		/* SVG Renderer */
 
 		.field {
 			fill: #6ac06e;
@@ -57,32 +91,32 @@
 		}
 		
 		.mid {
-			stroke-width: 0.13;
+			stroke-width: 1.3;
 		}
 		.center {
 			fill: #6ac06e;
 			stroke: white;
-			stroke-width: 0.1;
+			stroke-width: 1;
 		}
 		
 		.zoneLine {
-			stroke-dasharray: 1, 0.5;
-			stroke-width: 0.1;
+			stroke-dasharray: 10 5;
+			stroke-width: 1;
 			opacity: 0.9;
 		}
 		.zone {
-			opacity: 0.15;
+			fill-opacity: 0.15;
 		}
 		
 		.goal {
-			stroke-width: 0.1;
+			stroke-width: 1;
 			opacity: 0.7;
 		}
 		
 		.start {
+			stroke-width: 1.1;
+			stroke-dasharray: 4 2;
 			opacity: 0.2;
-			stroke-width: 0.11;
-			stroke-dasharray: 0.4, 0.2;
 		}
 		
 		.bludger {
@@ -92,7 +126,7 @@
 		.quaffle {
 			fill: white;
 			stroke: black;
-			stroke-width: 0.1;
+			stroke-width: 1;
 		}
 		
 		.snitch {
@@ -102,23 +136,23 @@
 		.hoop {
 			fill: none;
 			stroke: black;
-			stroke-width: 0.1;
+			stroke-width: 1;
 		}
 		
-		.team0, .team0 .controlled, .team0 .me {
+		.team0, .team0.controlled, .team0.me {
 			fill: red;
 		}
-		.team1, .team1 .controlled, .team1 .me {
+		.team1, .team1.controlled, .team1.me {
 			fill: blue;
 		}
 		
 		.player {
-			stroke-width:0.1;
-			stroke-dasharray: 0.4 0.2;
+			stroke-width: 1;
+			stroke-dasharray: 3 2;
 			fill: rgba(80,80,80,0.5);
 		}
 		.player.controlled, .player.me {
-			stroke-dasharray: none;
+			stroke-dasharray: 0 0;
 		}
 		.beater {
 			stroke: black;
@@ -127,7 +161,7 @@
 			stroke: white;
 		}
 		.keeper {
-			stroke: lime;
+			stroke: #00ff00;
 		}
 		.seeker {
 			stroke: gold;

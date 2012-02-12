@@ -19,26 +19,29 @@
 			right=0,
 			left=0,
 			up=0,
-			left=0,
+			down=0,
 			fire=false;
 		d3.select(document).on('keydown', function(){
 			var e = d3.event,
-				prevent=false,
-				arrow = key.arrow;
+				prevent=false;
 		    switch (e.keyCode){
-		    	case arrow.left:
+		    	case key.arrow.left:
+		    	case key.wasd.left:
 		    		left=1;
 		    		prevent=true;
 		    		break;
-		    	case arrow.right:
+		    	case key.arrow.right:
+		    	case key.wasd.right:
 		    		right=1;
 		    		prevent=true;
 		    		break;
-		    	case arrow.up:
+		    	case key.arrow.up:
+		    	case key.wasd.up:
 		    		up=1;
 		    		prevent=true;
 		    		break;
-		    	case arrow.down:
+		    	case key.arrow.down:
+		    	case key.wasd.down:
 		    		down=1;
 		    		prevent=true;
 		    		break;
@@ -53,22 +56,25 @@
 		});
 		d3.select(document).on('keyup',function(){
 			var e = d3.event,
-				prevent=false,
-				arrow = key.arrow;
+				prevent=false;
 		    switch (e.keyCode){
-		    	case arrow.left:
+		    	case key.arrow.left:
+		    	case key.wasd.left:
 		    		left=0;
 		    		prevent=true;
 		    		break;
-		    	case arrow.right:
+		    	case key.arrow.right:
+		    	case key.wasd.right:
 		    		right=0;
 		    		prevent=true;
 		    		break;
-		    	case arrow.up:
+		    	case key.arrow.up:
+		    	case key.wasd.up:
 		    		up=0;
 		    		prevent=true;
 		    		break;
-		    	case arrow.down:
+		    	case key.arrow.down:
+		    	case key.wasd.down:
 		    		down=0;
 		    		prevent=true;
 		    		break;
@@ -87,11 +93,37 @@
 		var tstart,
 			tmove,
 			tstop,
+			canvas,
+			c,
 			lStick = {
 				id: -1,
 				start: [0,0],
 				cur: [0,0]
-			};		
+			};
+			setupCanvas();
+			
+			function setupCanvas() {
+				var container = document.createElement( 'div' );
+				canvas = document.createElement( 'canvas' );
+				c = canvas.getContext( '2d' );
+				container.className = "joysticks";
+				document.body.appendChild( container );
+				container.appendChild(canvas);	
+			
+				canvas.width = window.innerWidth; 
+				canvas.height = window.innerHeight; 
+			
+				c.strokeStyle = "cyan";
+				c.lineWidth =2;	
+			}
+			function circle(x,y,r){
+				c.beginPath();
+				c.arc(x,y,r,0,Math.PI*2,true);
+				c.stroke();
+			}
+			function clear(){
+				c.clearRect(0,0,canvas.width,canvas.height);
+			}
 		tstart = function(e){
 			if (!~lStick.id){
 				var width = window.innerWidth || document.documentElement.offsetWidth;
@@ -100,6 +132,9 @@
 						lStick.id = e.changedTouches[i].identifier;
 						lStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
 						lStick.cur = lStick.start;
+						clear();
+						circle(lStick.start[0],lStick.start[1],30);
+						circle(lStick.start[0],lStick.start[1],40);
 						break;
 					}
 				}
@@ -111,6 +146,10 @@
 				for (var i=0, l=e.changedTouches.length; i<l; i++){
 					if (e.changedTouches[i].identifier == lStick.id){
 						lStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+						clear();
+						circle(lStick.start[0],lStick.start[1],30);
+						circle(lStick.start[0],lStick.start[1],40);
+						circle(lStick.cur[0],lStick.cur[1],30);
 						break;
 					}
 				}
@@ -121,6 +160,7 @@
 			lStick.id=-1;
 			lStick.start =[0,0];
 			lStick.cur = lStick.start;
+			clear();
 		};
 	
 		document.addEventListener('touchstart',tstart);
@@ -133,14 +173,16 @@
 				if (!~lStick.id){
 					return [0,0];
 				} else {
-					return [lStick.cur[0]-lStick.start[0],lStick.cur[1]-lStick.start[1]];
+					return [(lStick.cur[0]-lStick.start[0])*0.1,(lStick.cur[1]-lStick.start[1])*0.1];
 				}
+			},
+			onPickPlayer: function(callback){
+				
 			}
 		}
 	},
 	InputManager = function(override){
 		var manager;
-		
 		if (typeof override === 'function'){
 			manager=override();
 		} else if ('ontouchstart' in window){ //touch device
@@ -158,11 +200,14 @@
 	
 	
 	
-	var SVGisCoolforHavingaDOM = function(){
+	var SVGisCoolforHavingaDOM = function(scale){
+		scale = scale || 1;
+	
 		var svg = d3.select('#game').append('svg').attr('height','99%').attr('width','100%'),
-			game = svg.append('g').attr('transform','scale(15)'),
-			balls =[],
-			players = [];		
+			game = svg.append('g').attr('transform','scale('+scale+')'),
+			ballG,
+			playG,
+			R;	
 
 		function makeDup(pitchLength,distance){
 			if (typeof distance === 'undefined'){
@@ -177,6 +222,7 @@
 			init: function(start){
 				var field = start.field,
 					state = start.state,
+					pos = start.positions,
 					x = field.bounds[0]/2,
 					y = field.bounds[1]/2,
 					dup = makeDup(field.bounds[0]);
@@ -201,7 +247,7 @@
 				
 				f.append('ellipse').attr('cx',x).attr('rx',x).attr('cy',y).attr('ry',y).attr('class','field');
 				f.append('line').classed('mid',true).attr('x1',x).attr('x2',x).attr('y1',0).attr('y2',field.bounds[1]);
-				f.append('circle').classed('center',true).attr('cx',x).attr('cy',y).attr('r',0.6);
+				f.append('circle').classed('center',true).attr('cx',x).attr('cy',y).attr('r',6);
 				
 				
 				//mirrored lines and goals
@@ -248,50 +294,331 @@
 					.enter()
 					.append('ellipse')
 						.classed('hoop',true)
-						.attr('rx',0.1)
+						.attr('rx',1)
 						.attr('ry',field.goalDiam/2)
 						.attr('cx',function(d){ return d.x })
 						.attr('cy',function(d){ return d.y });
 			
-			ballG.selectAll('circle')
+				ballG.selectAll('circle')
 					.data(state.b)
 					.enter()
 					.append('circle')
-					.attr('r',function(d,i){
-						if (i==0){
-							return R[1];
-						} else if (i<4){
-							return R[2];
-						} else {
-							return R[3];
-						}
-					})
-					.attr('class',function(d,i){
-						if (i==0){
-							return 'quaffle';
-						} else if (i<4){
-							return 'bludger';
-						} else {
-							return 'snitch';
-						}
-					})
-					.attr('cx',function(d){ return d[0] })
-					.attr('cy',function(d){ return d[1] });
+						.attr('r',function(d,i){
+							if (i==0){
+								return R[1];
+							} else if (i<4){
+								return R[2];
+							} else {
+								return R[3];
+							}
+						})
+						.attr('class',function(d,i){
+							if (i==0){
+								return 'quaffle';
+							} else if (i<4){
+								return 'bludger';
+							} else {
+								return 'snitch';
+							}
+						})
+						.attr('cx',function(d){ return d[0] })
+						.attr('cy',function(d){ return d[1] });
 			
-				
+				playG.selectAll('.player')
+					.data(state.p)
+					.enter()
+					.append('circle')
+						.attr('class',function(d,i){ return pos[i%7] + ' team'+(+(i>6)); })
+						.classed('player',true)
+						.map(function(d,i){ d[2] = parseInt(i>6,10); return d; })
+						.attr('r',R[0])
+						.attr('cx',function(d,i){ return d[0] })
+						.attr('cy',function(d,i){ return d[1] })
+						.on('click',function(d,i){
+							d3.select(this).classed('me',true);
+						})
 
 			},
 			display: function(state){
+				playG.selectAll('.player')
+					.data(state.p)
+					.attr('cx',function(d){ return d[0]; })
+					.attr('cy',function(d){ return d[1]; });
 				
+				ballG.selectAll('circle')
+					.data(state.b)
+					.attr('cx',function(d){ return d[0] })
+					.attr('cy',function(d){ return d[1] });
 			}
 		}
 	},
+	CanvasIsFasterThough = function(scale){
+		var container = document.getElementById('game'),
+			canvas = document.createElement( 'canvas' ),
+			c = canvas.getContext( '2d' ),
+			buffer = document.createElement('canvas'),   //draw off screen, then copy result
+			b = buffer.getContext('2d'), 
+			pos,
+			posMap = {seeker:'gold',chaser:'white',beater:'black',keeper:'lime'},
+			R=[],										//radii of objects
+			box=[];										//active bounding box
+		container.appendChild(canvas);	
+		
+	
+		canvas.width = window.innerWidth; 
+		canvas.height = window.innerHeight;
+		buffer.width = canvas.width;
+		buffer.height=canvas.height;
+		canvas.id='movement';
+		
+		scale = scale || 1;
+		//c.scale(scale,scale);
+		b.scale(scale,scale);
+		
+		
+/*	
+var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
+if (CP.lineTo) {
+    CP.dashedLine = function(x, y, x2, y2, da) {
+        if (!da) da = [10,5];
+        this.save();
+        var dx = (x2-x), dy = (y2-y);
+        var len = Math.sqrt(dx*dx + dy*dy);
+        var rot = Math.atan2(dy, dx);
+        this.translate(x, y);
+        this.moveTo(0, 0);
+        this.rotate(rot);       
+        var dc = da.length;
+        var di = 0, draw = true;
+        x = 0;
+        while (len > x) {
+            x += da[di++ % dc];
+            if (x > len) x = len;
+            draw ? this.lineTo(x, 0): this.moveTo(x, 0);
+            draw = !draw;
+        }       
+        this.restore();
+    }
+}
+*/
+var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
+if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
+    if(! dashArray) dashArray=[10,5];
+    var dashCount = dashArray.length,
+    	dx = (x2 - x),
+    	dy = (y2 - y),
+    	xSlope = (Math.abs(dx) > Math.abs(dy)),
+    	slope = (xSlope) ? dy / dx : dx / dy;
+
+    this.moveTo(x, y);
+    var distRemaining = Math.sqrt(dx * dx + dy * dy),
+    	dashIndex = 0;
+    while(distRemaining >= 0.1){
+        var dashLength = Math.min(distRemaining, dashArray[dashIndex % dashCount]);
+        var step = Math.sqrt(dashLength * dashLength / (1 + slope * slope));
+        if(xSlope){
+            if(dx < 0) step = -step;
+            x += step
+            y += slope * step;
+        }else{
+            if(dy < 0) step = -step;
+            x += slope * step;
+            y += step;
+        }
+        this[(dashIndex % 2 == 0) ? 'lineTo' : 'moveTo'](x, y);
+        distRemaining -= dashLength;
+        dashIndex++;
+    }
+}								
+		
+
+		return {
+			init: function(start){
+				var pitch = document.createElement('canvas'),
+					ctx = pitch.getContext('2d'),
+					field = start.field,
+					state = start.state,
+					x = field.bounds[0]/2,
+					y = field.bounds[1]/2;	
+				pos=start.positions;
+				R=field.R;
+				
+				
+				
+				pitch.width= window.innerWidth;
+				pitch.height=window.innerHeight;
+				pitch.id='pitch';
+				container.appendChild(pitch);
+				
+				
+				ctx.scale(scale,scale);
+				ctx.fillStyle='#6ac06e';
+				ctx.strokeStyle='white';
+
+				//field
+				ctx.save()
+				ctx.scale((field.bounds[0]/field.bounds[1]),1);
+				ctx.moveTo(0,0);
+				ctx.beginPath();
+				ctx.arc(y,y,y,0,Math.PI*2,true);
+				ctx.fill();
+				ctx.restore();
+				
+				
+				ctx.globalCompositeOperation = 'source-atop';
+
+				
+				//midlines
+				ctx.beginPath();
+				ctx.lineWidth = 1.3;
+				ctx.moveTo(x,0);
+				ctx.lineTo(x,field.bounds[1]);
+				ctx.closePath();
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.lineWidth=1;
+				ctx.arc(x,y,6,0,Math.PI*2,true);
+				ctx.closePath();
+				ctx.fill();
+				ctx.stroke();
+					
+				
+				//keeper zones
+				ctx.fillStyle='rgba(255,0,0,0.15)';
+				ctx.fillRect(0,0,field.keepZone,field.bounds[1]);
+				ctx.fillStyle='rgba(0,0,255,0.15)';
+				ctx.fillRect(field.bounds[0]-field.keepZone,0,field.keepZone,field.bounds[1]);		
+				
+				
+				//keeper lines
+				ctx.beginPath();
+				ctx.lineWidth=0.9;
+				ctx.dashedLine(field.keepZone,0,field.keepZone,field.bounds[1]);
+				ctx.closePath();
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.dashedLine(field.bounds[0]-field.keepZone,0,field.bounds[0]-field.keepZone,field.bounds[1]);
+				ctx.closePath();
+				ctx.stroke();
+				
+				//goal lines
+				ctx.globalAlpha=0.8;
+				ctx.beginPath();
+				ctx.lineWidth=0.8;
+				ctx.moveTo(field.goalLine,0);
+				ctx.lineTo(field.goalLine,field.bounds[1]);
+				ctx.closePath();
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.lineWidth=0.8;
+				ctx.moveTo(field.bounds[0]-field.goalLine,0);
+				ctx.lineTo(field.bounds[0]-field.goalLine,field.bounds[1]);
+				ctx.closePath();
+				ctx.stroke();
+				ctx.globalAlpha=1;
+				
+				
+				
+				//start lines
+				ctx.beginPath();
+				ctx.lineWidth=0.3;
+				ctx.dashedLine(field.playerStart,0,field.playerStart,field.bounds[1],[4,2]);
+				ctx.closePath();
+				ctx.stroke();
+				
+				ctx.beginPath();
+				ctx.dashedLine(field.bounds[0]-field.playerStart,0,field.bounds[0]-field.playerStart,field.bounds[1],[4,2]);
+				ctx.closePath();
+				ctx.stroke();
+
+				
+				//hoops
+				var bow = 2,
+					r = field.goalDiam/2;
+				ctx.lineWidth=1;
+				ctx.strokeStyle='black';
+				for (var i=0, l=field.goals.length; i<l; i++){
+					ctx.beginPath();
+					ctx.moveTo(field.goalLine,field.goals[i]+r)
+					ctx.quadraticCurveTo(field.goalLine+bow,field.goals[i],field.goalLine,field.goals[i]-r);
+					ctx.quadraticCurveTo(field.goalLine-bow,field.goals[i],field.goalLine,field.goals[i]+r);
+					ctx.stroke();
+					
+					ctx.beginPath();
+					ctx.moveTo(field.bounds[0]-field.goalLine,field.goals[i]+r)
+					ctx.quadraticCurveTo(field.bounds[0]-field.goalLine+bow,field.goals[i],field.bounds[0]-field.goalLine,field.goals[i]-r);
+					ctx.quadraticCurveTo(field.bounds[0]-field.goalLine-bow,field.goals[i],field.bounds[0]-field.goalLine,field.goals[i]+r);
+					ctx.stroke();
+				}
+				
+				box=[0,0,field.bounds[0],field.bounds[1]];
+
+			},
+			display: function(state){
+				var xmin=0,ymin=0,xmax=0,ymax=0;
+			
+				b.lineWidth = 2;
+				b.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
+				c.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
+				b.fillStyle='red';
+				for (var i=0, l=state.p.length; i<l; i++){
+					if (i>6){
+						b.fillStyle='blue';
+					}
+					b.strokeStyle = posMap[pos[i%7]];
+					b.beginPath();
+					b.arc(state.p[i][0],state.p[i][1],R[0],0,Math.PI*2);
+					b.closePath();
+					b.stroke();
+					b.fill();
+					
+					xmin = ((state.p[i][0]-R[0]-2) < xmin) ? (state.p[i][0]-R[0]-2) : xmin;
+					xmax = ((state.p[i][0]+R[0]+2) > xmax) ? (state.p[i][0]+R[0]+2) : xmax;
+					ymax = ((state.p[i][1]+R[0]+2) > ymax) ? (state.p[i][1]+R[0]+2) : ymax;
+					ymin = ((state.p[i][1]-R[0]-2) < ymin) ? (state.p[i][1]-R[0]-2) : ymin;
+				}
+				xmin = Math.max(~~xmin,0);
+				ymin = Math.max(~~ymin,0);
+				xmax = Math.min(~~xmax,window.innerWidth);
+				ymax = Math.min(~~ymax,window.innerHeight);
+				
+				b.fillStyle='white';
+				b.strokeStyle='black';
+				b.beginPath();
+				b.arc(state.b[0][0],state.b[0][1],R[1],0,Math.PI*2);
+				b.closePath();
+				b.stroke();
+				b.fill();
+				
+				b.fillStyle='black';
+				for (var i=1, l=state.b.length-1; i<l; i++){
+					b.beginPath();
+					b.arc(state.b[i][0],state.b[i][1],R[2],0,Math.PI*2);
+					b.closePath();
+					b.fill();
+				}
+				
+				b.fillStyle='gold';
+				b.beginPath();
+				b.arc(state.b[4][0],state.b[4][1],R[3],0,Math.PI*2);
+				b.closePath();
+				b.fill();
+				c.drawImage(buffer,0,0);
+				
+				box = [xmin*scale,ymin*scale,xmax*scale,ymax*scale];
+			}
+		}	
+	},
 	Renderer = function(override){	//can add Canvas, or HTML+CSS later
-		var manager;
+		var manager,
+			scale=1.5;
 		if (typeof override =='function'){
-			manager=override();
+			manager=override(scale);
 		} else {
-			manager=SVGisCoolforHavingaDOM();
+			manager=SVGisCoolforHavingaDOM(scale);
 		}
 		
 		//Interface
@@ -299,7 +626,7 @@
 			init: function(field){ return manager.init(field); }, //draw field and initial state
 			display: function(state){ return manager.display(state); }
 		}
-	}();
+	}(CanvasIsFasterThough);
 	
 	
 	
@@ -326,7 +653,7 @@
 				}
 			}
 		} else {
-			alert('Gamer server currently down');
+			//alert('Gamer server currently down');
 			return {
 				connected: false,
 				send: function(){},
@@ -336,26 +663,114 @@
 	};
 	
 	var Engine = function(){
-		var defState = {
-				b: [
-					[22,13.5], //quaffle
-					[22,16.5], //bludger
-					[22,7.5],
-					[22,22.5],
-					[22,15] //snitch
-				],
-				p: {
+		var defState = {},
+			curState = {},
+			positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
+			players = [],
+			speed=1,
+			balls = [];
+			
+			var x=78,
+				y,
+				t=0;
+			for (var i=0; i<14; i++){
+				if (i>6){
+					x=362;
+					t=1;
 				}
-			},
-			curState = {
-				
-			},
-			Ball = function(){
-				
+				y = 90+20*(i%7);
+				players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
+			}
+			x=220;
+			for (var i=0; i<5; i++){
+				switch(i){
+					case 0:
+						y=135;
+						break;
+					case 1:
+						y=75;
+						break;
+					case 2:
+						y=165;
+						break;
+					case 3:
+						y=225;
+						break;
+					case 4:
+						y=150;
+						break;
+				}
+				if (i<4){
+					balls[i]=new Ball([x,y],[0,0],i);
+				} else {
+					balls[i] = new Snitch([x,y],[0,0]);
+				}
+			}
+			
+			function Player(p,l,v,t,i,o,h){
+				this.loc = l;
+				this.position=p;
+				this.velo = v;
+				this.team = t;
+				this.idx = i;
+				this.out= !!o; //undefined sets to false
+				this.hold= (typeof h == 'undefined')? 6 : +h;	//6 is not being held
+			}
+			
+			function Ball(l,v,i,h,d,t,g){
+				this.loc=l;
+				this.velo = v;
+				this.idx=i;
+				this.hold= (typeof h =='undefined')? -1 : +h;
+				this.dead= !!d;
+				this.thrower=(typeof t =='undefined')? -1: +t;
+				this.ignore= g || [];
+			}
+			function Snitch(l,v){
+				this.loc=l;
+				this.velo=v;
 			}
 		
 		function expand(s){
+			var e = {b:[], p:[]},
+				b = s.b,
+				p = s.p,
+				t=0,
+				k=[],
+				g=[];
+			
+			for (var i=0, l=s.b.length; i<l; i++){
+				k = b[i];
+				g=[];
+				if (i<4){
+					if (k.length > 7){
+						for (var j=7, m=k.length; j<m; j++){
+							g.push(k[j]);
+						}
+					}
+					e.b[i] = new Ball([k[0],k[1]],[k[2],k[3]],i,k[4],k[5],k[6],g)
+				} else {
+					e.b[i] = new Snitch([k[0],k[1]],[k[2],k[3]]);
+				}
+			}
+			for (var i=0, l=s.p.length; i<l; i++){
+				k = p[i];
+				if (i>6){
+					t=1;
+				}
+				e.p[i] = new Player(positions[i%7],[k[0],k[1]],[k[2],k[3]],t,i,k[5],k[6]);
+			}
+			return e;
+		}
 		
+		
+		defState = {b:clone(balls),p:clone(players)};
+		function bound(x){
+			if (x<0){
+				return Math.max(-1,x);
+			} else {
+				return Math.min(1,x);
+			}
 		}
 		
 		return {
@@ -364,25 +779,28 @@
 				this.reset();
 				return {
 						field: {
-							bounds: [44,30], //44m by 30m ellipse
-							keepZone: 11, //distance from edge
-							playerStart: 7.8,
-							goalLine: 5.5,
-							goals: [12.7,15,17.3], //y position along the goal line
-							goalHeights: [0.9,1.8,1.4],	//heights, in order
-							goalDiam: 1,
-							R:[0.7, 0.4, 0.3, 0.1] //Radius of [player,quaffle,bludger,snitch]
+							bounds: [440,300], //44m by 30m ellipse
+							keepZone: 110, //distance from edge
+							playerStart: 78,
+							goalLine: 55,
+							goals: [127,150,173], //y position along the goal line
+							goalHeights: [9,18,14],	//heights, in order
+							goalDiam: 10,
+							R:[5.2, 3, 2, 1] //Radius of [player,quaffle,bludger,snitch]
+							//2.2 shoulder length, 8.3 armspan, 
 						},
+						positions: positions,
 						state: that.getState()
 					};
 			},
 			reset: function(){ //initial state
-				curState = copy(defState);
+				curState = clone(defState);
 				return this.getState();
 			},
 			apply: function(input){ //input is force changes on object
-			
-			
+				var self = curState.p[1];
+				self.loc[0] += speed*bound(input[0]);
+				self.loc[1] += speed*bound(input[1]);
 				return this.getState();	
 			},
 			setState: function(newState){
@@ -390,7 +808,14 @@
 				return this.getState();
 			},
 			getState: function(){
-				
+				var view = {b:[],p:[]};
+				for (var i=0, l=curState.p.length; i<l; i++){
+					view.p[i] = [curState.p[i].loc[0],curState.p[i].loc[1]];
+				}
+				for (var i=0, l=curState.b.length; i<l; i++){
+					view.b[i] = [curState.b[i].loc[0],curState.b[i].loc[1]];
+				}
+				return view;
 			}
 		}
 	}();
@@ -423,7 +848,7 @@
 			var velo = InputManager.getInputs(),
 				state = Engine.apply(velo);
 			Renderer.display(state);
-			window.requestAnimFrame(loop);
+			window.requestAnimationFrame(loop);
 		}
 		
 		return {
@@ -434,6 +859,7 @@
 		}
 	}();
 	
+	Controller.start();
 	
 	var Player = Class.extend({
 		init: function(element,idx){
@@ -574,18 +1000,8 @@
 			setTimeout(function(){ clearInterval(thisBall._motion.intvl); thisBall._motion=false;  },time);
 		}
 		
-	}),
-	Quaffle = Ball.extend({
-	
-	}),
-	Bludger = Ball.extend({
-	
-	}),
-	Snitch = Class.extend({
-		init: function(element){
-			this._el = element;
-		}
 	})
+
 	
 	function collision(el1,el2){
 		var x1 = +el1._el.attr('cx'),
@@ -615,7 +1031,6 @@
 		return idx;
 	}
 	
-		var t0 = new Date();
 	function moveLoop(){
 			//var t1 = new Date(),
 			//	obs = ~~(1000/(t1-t0));
@@ -727,7 +1142,7 @@
 				
 			}
 		if (game){
-			window.requestAnimFrame(moveLoop);
+			window.requestAnimationFrame(moveLoop);
 		}
 	}
 	
@@ -760,15 +1175,6 @@
 
 
 
-	quaf = new Quaffle(d3.select('.quaffle'));
-	snitch = new Snitch(d3.select('.snitch'));
-	d3.selectAll('.bludger').each(function(){
-		bludgers.push(new Bludger(d3.select(this)));
-	});
-	d3.selectAll('.player').each(function(d,i){
-		players.push(new Player(d3.select(this),i));
-	})
-	
 	
 
 	dispatch.ca = function(d){ //claim answer

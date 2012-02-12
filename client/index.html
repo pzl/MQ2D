@@ -4,72 +4,12 @@
 	<link rel="stylesheet" href="style.css" />
 	<script type="text/javascript" src="plugs.js"></script>
 	<script type="text/javascript" src="http://localhost:3050/socket.io/socket.io.js"></script>
+	<meta name="viewport" content="width=device-width, height=device-height"/>
+	<meta name="apple-mobile-web-app-capable" content="yes"/>
+	<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
 </head>
 <body>
 	<div id="game"></div>
-	<!--<svg height="99%" width="100%">
-		<defs>
-			<clippath id="fieldClip">
-				<ellipse cx="22" cy="15" rx="22" ry="15"/>
-			</clippath>
-		</defs>
-		<g transform="scale(15)">
-			<g class="pitch" clip-path="url(#fieldClip)">
-				<ellipse class="field" cx="22" cy="15" rx="22" ry="15"/>
-				<line class="mid" x1="22" y1="0" x2="22" y2="30" />
-				<circle class="center" cx="22" cy="15" r="0.6" />
-	
-				
-				<line class="zoneLine" x1="11" y1="0" x2="11" y2="30" />
-				<line class="zoneLine" x1="33" y1="0" x2="33" y2="30" />
-				<rect class="zone team0" x="0" y="0" width="11" height="30" />
-				<rect class="zone team1" x="33" y="0" width="11" height="30" />
-				
-				<line class="goal" x1="5.5" y1="0" x2="5.5" y2="30" />
-				<line class="goal" x1="38.5" y1="0" x2="38.5" y2="30" />
-				
-				<line class="start" x1="7.8" y1="0" x2="7.8" y2="30" />
-				<line class="start" x1="36.2" y1="0" x2="36.2" y2="30" />
-				
-				
-				<ellipse class="hoop" cx="5.5" cy="15" rx="0.1" ry="0.5" />
-				<ellipse class="hoop" cx="5.5" cy="12.7" rx="0.1" ry="0.5" />
-				<ellipse class="hoop" cx="5.5" cy="17.3" rx="0.1" ry="0.5" />
-				
-				<ellipse class="hoop" cx="38.5" cy="15" rx="0.1" ry="0.5" />
-				<ellipse class="hoop" cx="38.5" cy="12.7" rx="0.1" ry="0.5" />
-				<ellipse class="hoop" cx="38.5" cy="17.3" rx="0.1" ry="0.5" />
-			</g>
-			<g class="balls">
-				<circle class="quaffle" cx="22" cy="13.5" r="0.4" />
-				<circle class="bludger" cx="22" cy="16.5" r="0.3" />
-				<circle class="bludger" cx="22" cy="7.5" r="0.3" />
-				<circle class="bludger" cx="22" cy="22.5" r="0.3" />
-				
-				<circle class="snitch" cx="22" cy="15" r="0.1" />
-			</g>
-			<g class="players">
-				<g class="team team0">
-					<circle class="player seeker" data-position="seeker" data-team="0" cx="7.8" cy="9"  r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="0" cx="7.8" cy="11" r="0.7" />
-					<circle class="player beater" data-position="beater" data-team="0" cx="7.8" cy="13" r="0.7" />
-					<circle class="player keeper" data-position="keeper" data-team="0" cx="7.8" cy="15" r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="0" cx="7.8" cy="17" r="0.7" />
-					<circle class="player beater" data-position="beater" data-team="0" cx="7.8" cy="19" r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="0" cx="7.8" cy="21" r="0.7" />
-				</g>
-				<g class="team team1">
-					<circle class="player seeker" data-position="seeker" data-team="1" cx="36.2" cy="9"  r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="1" cx="36.2" cy="11" r="0.7" />
-					<circle class="player beater" data-position="beater" data-team="1" cx="36.2" cy="13" r="0.7" />
-					<circle class="player keeper" data-position="keeper" data-team="1" cx="36.2" cy="15" r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="1" cx="36.2" cy="17" r="0.7" />
-					<circle class="player beater" data-position="beater" data-team="1" cx="36.2" cy="19" r="0.7" />
-					<circle class="player chaser" data-position="chaser" data-team="1" cx="36.2" cy="21" r="0.7" />
-				</g>
-			</g>
-		</g>
-	</svg>-->
 	<script type="text/javascript" src="game.js"></script>
 </body>
 </html>
