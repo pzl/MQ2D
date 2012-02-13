@@ -20,7 +20,8 @@
 			left=0,
 			up=0,
 			down=0,
-			fire=false;
+			API = {},
+			shootCB;
 		d3.select(document).on('keydown', function(){
 			var e = d3.event,
 				prevent=false;
@@ -46,7 +47,9 @@
 		    		prevent=true;
 		    		break;
 		    	case key.space:
-		    		fire=true;
+		    		if (typeof shootCB == 'function'){
+		    			shootCB();
+		    		}
 		    		prevent=true;
 		    		break;
 		    }
@@ -83,84 +86,122 @@
 		   		e.preventDefault();
 		   	}
 		});
-		return {
+		API = {
 			getInputs: function(){
 				return [right-left,down-up];
+			},
+			onPickPlayer: function(el,cb){
+				d3.select(el).on('click',function(){
+					cb(d3.event);
+					return false;
+				})	
+			},
+			shoot: function(cb){
+				shootCB = cb;
 			}
 		}
+		return API;
 	},
 	Touch = function(){
-		var tstart,
+		var API = {},
+			tstart,
 			tmove,
 			tstop,
 			canvas,
 			c,
+			shootCB,
 			lStick = {
 				id: -1,
 				start: [0,0],
 				cur: [0,0]
+			},
+			rStick = {
+				id: -1,
+				start: [0,0],
+				cur: [0,0]
 			};
-			setupCanvas();
-			
-			function setupCanvas() {
-				var container = document.createElement( 'div' );
-				canvas = document.createElement( 'canvas' );
-				c = canvas.getContext( '2d' );
-				container.className = "joysticks";
-				document.body.appendChild( container );
-				container.appendChild(canvas);	
-			
-				canvas.width = window.innerWidth; 
-				canvas.height = window.innerHeight; 
-			
-				c.strokeStyle = "cyan";
-				c.lineWidth =2;	
-			}
-			function circle(x,y,r){
+
+			var container = document.createElement( 'div' ),
+				canvas = document.createElement( 'canvas' ),
+				c = canvas.getContext( '2d' ),
+				moveColor = 'cyan',
+				fireColor = '#FF3938';
+			container.className = "joysticks";
+			document.body.appendChild( container );
+			container.appendChild(canvas);	
+		
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		
+			c.strokeStyle = moveColor;
+			c.lineWidth =2;
+			function circle(x,y,r,color){
+				c.strokeStyle = color;
 				c.beginPath();
-				c.arc(x,y,r,0,Math.PI*2,true);
+				c.arc(x,y,r,0,Math.PI*2);
 				c.stroke();
 			}
 			function clear(){
 				c.clearRect(0,0,canvas.width,canvas.height);
 			}
 		tstart = function(e){
-			if (!~lStick.id){
-				var width = window.innerWidth || document.documentElement.offsetWidth;
-				for (var i=0, l=e.changedTouches.length; i<l; i++){
-					if (e.changedTouches[i].clientX <= width/2){
-						lStick.id = e.changedTouches[i].identifier;
-						lStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
-						lStick.cur = lStick.start;
-						clear();
-						circle(lStick.start[0],lStick.start[1],30);
-						circle(lStick.start[0],lStick.start[1],40);
-						break;
-					}
+			var width = window.innerWidth;
+			clear();
+			for (var i=0, l=e.changedTouches.length; i<l; i++){
+				if (!~lStick.id && e.changedTouches[i].clientX <= width/2){
+					lStick.id = e.changedTouches[i].identifier;
+					lStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+					lStick.cur = lStick.start;
+					circle(lStick.start[0],lStick.start[1],30,moveColor);
+					circle(lStick.start[0],lStick.start[1],40,moveColor);
+					continue;
+				} else if (!~rStick.id &&  e.changedTouches[i].clientX >= width/2){
+					rStick.id = e.changedTouches[i].identifier;
+					rStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+					rStick.cur = rStick.start;
+					circle(rStick.start[0],rStick.start[1],30,fireColor);
+					circle(rStick.start[0],rStick.start[1],40,fireColor);
+					continue;
 				}
 			}
-
 		};
 		tmove = function(e){
-			if (!!~lStick.id){
-				for (var i=0, l=e.changedTouches.length; i<l; i++){
-					if (e.changedTouches[i].identifier == lStick.id){
-						lStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
-						clear();
-						circle(lStick.start[0],lStick.start[1],30);
-						circle(lStick.start[0],lStick.start[1],40);
-						circle(lStick.cur[0],lStick.cur[1],30);
-						break;
-					}
+			clear();
+			for (var i=0, l=e.changedTouches.length; i<l; i++){
+				if (!!~lStick.id && e.changedTouches[i].identifier == lStick.id){
+					lStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+					circle(lStick.start[0],lStick.start[1],30,moveColor);
+					circle(lStick.start[0],lStick.start[1],40,moveColor);
+					circle(lStick.cur[0],  lStick.cur[1],  30,moveColor);
+					continue;
+				} else if (!!~rStick.id && e.changedTouches[i].identifier == rStick.id){
+					rStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
+					circle(rStick.start[0],rStick.start[1],30,fireColor);
+					circle(rStick.start[0],rStick.start[1],40,fireColor);
+					circle(rStick.cur[0],  rStick.cur[1],  30,fireColor);
+					continue;
 				}
 			}
 			e.preventDefault();
 		};		
 		tstop = function(e){
-			lStick.id=-1;
-			lStick.start =[0,0];
-			lStick.cur = lStick.start;
-			clear();
+			for (var i=0, l=e.changedTouches.length; i<l; i++){
+				if (e.changedTouches[i].identifier == lStick.id){
+					lStick.id=-1;
+					lStick.start =[0,0];
+					lStick.cur = lStick.start;
+					continue;
+				} else if (e.changedTouches[i].identifier == rStick.id){
+					if (typeof shootCB == 'function'){
+						shootCB((rStick.cur[0]-rStick.start[0])*0.1,(rStick.cur[1]-rStick.start[1])*0.1);
+					}
+					rStick.id=-1;
+					rStick.start =[0,0];
+					rStick.cur = rStick.start;
+					continue;
+				}
+			}
+			clear(0,window.innerWidth);
 		};
 	
 		document.addEventListener('touchstart',tstart);
@@ -168,7 +209,7 @@
 		document.addEventListener('touchend',tstop);
 		document.addEventListener('touchcancel',tstop);
 		
-		return {
+		API = {
 			getInputs: function(){
 				if (!~lStick.id){
 					return [0,0];
@@ -176,10 +217,15 @@
 					return [(lStick.cur[0]-lStick.start[0])*0.1,(lStick.cur[1]-lStick.start[1])*0.1];
 				}
 			},
-			onPickPlayer: function(callback){
+			onPickPlayer: function(el,cb){
 				
+			},
+			shoot: function(cb){
+				shootCB = cb;
 			}
-		}
+		};
+		
+		return API;
 	},
 	InputManager = function(override){
 		var manager;
@@ -192,8 +238,8 @@
 		}
 		//Interface
 		return {
-			
-			getInputs: function(){ return manager.getInputs(); }//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
+			getInputs: function(){ return manager.getInputs(); },//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
+			shoot: function(cb){ return manager.shoot(cb); }
 		}
 	}();
 	
@@ -328,7 +374,9 @@
 					.data(state.p)
 					.enter()
 					.append('circle')
-						.attr('class',function(d,i){ return pos[i%7] + ' team'+(+(i>6)); })
+						.attr('class',function(d,i){ 
+							return pos[i%7] + ' team'+(+(i>6)) + ' ' + ((d.controlled) ? 'controlled' : '') ; 
+						})
 						.classed('player',true)
 						.map(function(d,i){ d[2] = parseInt(i>6,10); return d; })
 						.attr('r',R[0])
@@ -343,7 +391,10 @@
 				playG.selectAll('.player')
 					.data(state.p)
 					.attr('cx',function(d){ return d[0]; })
-					.attr('cy',function(d){ return d[1]; });
+					.attr('cy',function(d){ return d[1]; })
+					.classed('controlled',function(d,i){
+							return !!d[2];
+					});
 				
 				ballG.selectAll('circle')
 					.data(state.b)
@@ -372,64 +423,36 @@
 		canvas.id='movement';
 		
 		scale = scale || 1;
-		//c.scale(scale,scale);
 		b.scale(scale,scale);
+		var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
+		if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
+		    if(! dashArray) dashArray=[10,5];
+		    var dashCount = dashArray.length,
+		    	dx = (x2 - x),
+		    	dy = (y2 - y),
+		    	xSlope = (Math.abs(dx) > Math.abs(dy)),
+		    	slope = (xSlope) ? dy / dx : dx / dy;
 		
-		
-/*	
-var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
-if (CP.lineTo) {
-    CP.dashedLine = function(x, y, x2, y2, da) {
-        if (!da) da = [10,5];
-        this.save();
-        var dx = (x2-x), dy = (y2-y);
-        var len = Math.sqrt(dx*dx + dy*dy);
-        var rot = Math.atan2(dy, dx);
-        this.translate(x, y);
-        this.moveTo(0, 0);
-        this.rotate(rot);       
-        var dc = da.length;
-        var di = 0, draw = true;
-        x = 0;
-        while (len > x) {
-            x += da[di++ % dc];
-            if (x > len) x = len;
-            draw ? this.lineTo(x, 0): this.moveTo(x, 0);
-            draw = !draw;
-        }       
-        this.restore();
-    }
-}
-*/
-var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
-if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
-    if(! dashArray) dashArray=[10,5];
-    var dashCount = dashArray.length,
-    	dx = (x2 - x),
-    	dy = (y2 - y),
-    	xSlope = (Math.abs(dx) > Math.abs(dy)),
-    	slope = (xSlope) ? dy / dx : dx / dy;
-
-    this.moveTo(x, y);
-    var distRemaining = Math.sqrt(dx * dx + dy * dy),
-    	dashIndex = 0;
-    while(distRemaining >= 0.1){
-        var dashLength = Math.min(distRemaining, dashArray[dashIndex % dashCount]);
-        var step = Math.sqrt(dashLength * dashLength / (1 + slope * slope));
-        if(xSlope){
-            if(dx < 0) step = -step;
-            x += step
-            y += slope * step;
-        }else{
-            if(dy < 0) step = -step;
-            x += slope * step;
-            y += step;
-        }
-        this[(dashIndex % 2 == 0) ? 'lineTo' : 'moveTo'](x, y);
-        distRemaining -= dashLength;
-        dashIndex++;
-    }
-}								
+		    this.moveTo(x, y);
+		    var distRemaining = Math.sqrt(dx * dx + dy * dy),
+		    	dashIndex = 0;
+		    while(distRemaining >= 0.1){
+		        var dashLength = Math.min(distRemaining, dashArray[dashIndex % dashCount]);
+		        var step = Math.sqrt(dashLength * dashLength / (1 + slope * slope));
+		        if(xSlope){
+		            if(dx < 0) step = -step;
+		            x += step
+		            y += slope * step;
+		        }else{
+		            if(dy < 0) step = -step;
+		            x += slope * step;
+		            y += step;
+		        }
+		        this[(dashIndex % 2 == 0) ? 'lineTo' : 'moveTo'](x, y);
+		        distRemaining -= dashLength;
+		        dashIndex++;
+		    }
+		}								
 		
 
 		return {
@@ -559,10 +582,11 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 			},
 			display: function(state){
 				var xmin=0,ymin=0,xmax=0,ymax=0;
-			
-				b.lineWidth = 2;
 				b.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
 				c.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
+				
+				//players
+				b.lineWidth = 2;
 				b.fillStyle='red';
 				for (var i=0, l=state.p.length; i<l; i++){
 					if (i>6){
@@ -580,11 +604,9 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 					ymax = ((state.p[i][1]+R[0]+2) > ymax) ? (state.p[i][1]+R[0]+2) : ymax;
 					ymin = ((state.p[i][1]-R[0]-2) < ymin) ? (state.p[i][1]-R[0]-2) : ymin;
 				}
-				xmin = Math.max(~~xmin,0);
-				ymin = Math.max(~~ymin,0);
-				xmax = Math.min(~~xmax,window.innerWidth);
-				ymax = Math.min(~~ymax,window.innerHeight);
 				
+				
+				//balls
 				b.fillStyle='white';
 				b.strokeStyle='black';
 				b.beginPath();
@@ -592,6 +614,10 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				b.closePath();
 				b.stroke();
 				b.fill();
+				xmin = ((state.b[0][0]-R[1]-2) < xmin) ? (state.b[0][0]-R[1]-2) : xmin;
+				xmax = ((state.b[0][0]+R[1]+2) > xmax) ? (state.b[0][0]+R[1]+2) : xmax;
+				ymax = ((state.b[0][1]+R[1]+2) > ymax) ? (state.b[0][1]+R[1]+2) : ymax;
+				ymin = ((state.b[0][1]-R[1]-2) < ymin) ? (state.b[0][1]-R[1]-2) : ymin;
 				
 				b.fillStyle='black';
 				for (var i=1, l=state.b.length-1; i<l; i++){
@@ -599,6 +625,10 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 					b.arc(state.b[i][0],state.b[i][1],R[2],0,Math.PI*2);
 					b.closePath();
 					b.fill();
+					xmin = ((state.b[i][0]-R[2]) < xmin) ? (state.b[i][0]-R[2]) : xmin;
+					xmax = ((state.b[i][0]+R[2]) > xmax) ? (state.b[i][0]+R[2]) : xmax;
+					ymax = ((state.b[i][1]+R[2]) > ymax) ? (state.b[i][1]+R[2]) : ymax;
+					ymin = ((state.b[i][1]-R[2]) < ymin) ? (state.b[i][1]-R[2]) : ymin;
 				}
 				
 				b.fillStyle='gold';
@@ -607,6 +637,15 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				b.closePath();
 				b.fill();
 				c.drawImage(buffer,0,0);
+				xmin = ((state.b[4][0]-R[3]) < xmin) ? (state.b[4][0]-R[3]) : xmin;
+				xmax = ((state.b[4][0]+R[3]) > xmax) ? (state.b[4][0]+R[3]) : xmax;
+				ymax = ((state.b[4][1]+R[3]) > ymax) ? (state.b[4][1]+R[3]) : ymax;
+				ymin = ((state.b[4][1]-R[3]) < ymin) ? (state.b[4][1]-R[3]) : ymin;
+				
+				xmin = Math.max(~~xmin,0);
+				ymin = Math.max(~~ymin,0);
+				xmax = Math.min(~~xmax,window.innerWidth);
+				ymax = Math.min(~~ymax,window.innerHeight);
 				
 				box = [xmin*scale,ymin*scale,xmax*scale,ymax*scale];
 			}
@@ -668,69 +707,93 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 			positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
 			players = [],
 			speed=1,
-			balls = [];
+			balls = [],
+			R = [5.2, 3, 2, 1]; //Radius of [player,quaffle,bludger,snitch]
+							//2.2 shoulder length, 8.3 armspan,
 			
-			var x=78,
-				y,
-				t=0;
-			for (var i=0; i<14; i++){
-				if (i>6){
-					x=362;
-					t=1;
-				}
-				y = 90+20*(i%7);
-				players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
+		//set up players in default positions
+		var x=78,
+			y,
+			t=0;
+		for (var i=0; i<14; i++){
+			if (i>6){
+				x=362;
+				t=1;
 			}
-			x=220;
-			for (var i=0; i<5; i++){
-				switch(i){
-					case 0:
-						y=135;
-						break;
-					case 1:
-						y=75;
-						break;
-					case 2:
-						y=165;
-						break;
-					case 3:
-						y=225;
-						break;
-					case 4:
-						y=150;
-						break;
-				}
-				if (i<4){
-					balls[i]=new Ball([x,y],[0,0],i);
-				} else {
-					balls[i] = new Snitch([x,y],[0,0]);
-				}
+			y = 90+20*(i%7);
+			players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
+		}
+		//set up balls
+		x=220;
+		for (var i=0; i<5; i++){
+			switch(i){
+				case 0:
+					y=135;
+					break;
+				case 1:
+					y=75;
+					break;
+				case 2:
+					y=165;
+					break;
+				case 3:
+					y=225;
+					break;
+				case 4:
+					y=150;
+					break;
 			}
-			
-			function Player(p,l,v,t,i,o,h){
-				this.loc = l;
-				this.position=p;
-				this.velo = v;
-				this.team = t;
-				this.idx = i;
-				this.out= !!o; //undefined sets to false
-				this.hold= (typeof h == 'undefined')? 6 : +h;	//6 is not being held
+			if (i<4){
+				balls[i]=new Ball([x,y],[0,0],i);
+			} else {
+				balls[i] = new Snitch([x,y],[0,0]);
 			}
-			
-			function Ball(l,v,i,h,d,t,g){
-				this.loc=l;
-				this.velo = v;
-				this.idx=i;
-				this.hold= (typeof h =='undefined')? -1 : +h;
-				this.dead= !!d;
-				this.thrower=(typeof t =='undefined')? -1: +t;
-				this.ignore= g || [];
-			}
-			function Snitch(l,v){
-				this.loc=l;
-				this.velo=v;
-			}
+		}
 		
+		defState = {b:clone(balls),p:clone(players)};
+
+		
+		
+		function Player(p,l,v,t,i,o,h,c){
+			this.loc = l;
+			this.position=p;
+			this.velo = v;
+			this.team = t;
+			this.idx = i;
+			this.out= !!o; //undefined sets to false
+			this.hold= (typeof h == 'undefined')? 6 : +h;	//6 is not being held
+			this.controlled = !!c;
+			this.r = R[0];
+			this.inZone = function(){
+				if (team==1){
+					return !!(this.loc[0] > 440-110);	
+				} else {
+					return !!(this.loc[0] < 110);
+				}
+			}
+		}
+		function Ball(l,v,i,h,d,t,g){
+			this.loc=l;
+			this.velo = v;
+			this.idx=i;
+			this.hold= (typeof h =='undefined')? -1 : +h;
+			this.dead= !!d;
+			this.thrower=(typeof t =='undefined')? -1: +t;
+			this.ignore= g || [];
+			if (i==1){
+				this.r = R[1];
+			} else {
+				this.r = R[2];
+			}
+		}
+		function Snitch(l,v){
+			this.loc=l;
+			this.velo=v;
+			this.r = R[3];
+		}
+	
+		
+		//unpack from network transport
 		function expand(s){
 			var e = {b:[], p:[]},
 				b = s.b,
@@ -738,6 +801,7 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				t=0,
 				k=[],
 				g=[];
+			
 			
 			for (var i=0, l=s.b.length; i<l; i++){
 				k = b[i];
@@ -758,13 +822,10 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				if (i>6){
 					t=1;
 				}
-				e.p[i] = new Player(positions[i%7],[k[0],k[1]],[k[2],k[3]],t,i,k[5],k[6]);
+				e.p[i] = new Player(positions[i%7],[k[0],k[1]],[k[2],k[3]],t,i,k[5],k[6],k[7]);
 			}
 			return e;
-		}
-		
-		
-		defState = {b:clone(balls),p:clone(players)};
+		}		
 		function bound(x){
 			if (x<0){
 				return Math.max(-1,x);
@@ -772,6 +833,10 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				return Math.min(1,x);
 			}
 		}
+		function collision(a,b){
+			return !!(Math.sqrt(( b[0]-a[0] ) * ( b[0]-a[0] )  + ( b[1]-a[1] ) * ( b[1]-a[1] ) ) <= ( a.r + b.r ));
+		}
+		
 		
 		return {
 			init: function(){
@@ -786,8 +851,7 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 							goals: [127,150,173], //y position along the goal line
 							goalHeights: [9,18,14],	//heights, in order
 							goalDiam: 10,
-							R:[5.2, 3, 2, 1] //Radius of [player,quaffle,bludger,snitch]
-							//2.2 shoulder length, 8.3 armspan, 
+							R:R 
 						},
 						positions: positions,
 						state: that.getState()
@@ -798,10 +862,15 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				return this.getState();
 			},
 			apply: function(input){ //input is force changes on object
-				var self = curState.p[1];
-				self.loc[0] += speed*bound(input[0]);
-				self.loc[1] += speed*bound(input[1]);
-				return this.getState();	
+				curState.p[1].velo[0] = bound(input[0]);
+				curState.p[1].velo[1] = bound(input[1]);
+			},
+			update: function(){
+				for (var i=0, l=curState.p.length; i<l; i++){
+					curState.p[i].loc[0] += speed*curState.p[i].velo[0];
+					curState.p[i].loc[1] += speed*curState.p[i].velo[1];
+				}
+				return this.getState();
 			},
 			setState: function(newState){
 				curState = expand(newState);
@@ -810,7 +879,7 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 			getState: function(){
 				var view = {b:[],p:[]};
 				for (var i=0, l=curState.p.length; i<l; i++){
-					view.p[i] = [curState.p[i].loc[0],curState.p[i].loc[1]];
+					view.p[i] = [curState.p[i].loc[0],curState.p[i].loc[1],+curState.p[i].controlled];
 				}
 				for (var i=0, l=curState.b.length; i<l; i++){
 					view.b[i] = [curState.b[i].loc[0],curState.b[i].loc[1]];
@@ -846,8 +915,19 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 	
 		function loop(){
 			var velo = InputManager.getInputs(),
-				state = Engine.apply(velo);
-			Renderer.display(state);
+				now = new Date().getTime(),
+				dt=0,
+				
+			if (past){
+				dt = Math.min(1,(now-last)/1000);
+			}
+			Engine.apply(velo);
+			while (dt >= (1000/60)){
+				dt -= 1000/60;
+				Engine.update();
+			}
+			Renderer.display(Engine.update());
+			past=now;
 			window.requestAnimationFrame(loop);
 		}
 		
@@ -861,92 +941,21 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 	
 	Controller.start();
 	
+	
+	var stats = new Stats();
+	// Align top-left
+	stats.getDomElement().style.position = 'absolute';
+	stats.getDomElement().style.left = '0px';
+	stats.getDomElement().style.top = '0px';	
+	document.body.appendChild( stats.getDomElement() );
+	setInterval( function () {
+	
+	    stats.update();
+	
+	}, 1000 / 60 );
+	
+	/*
 	var Player = Class.extend({
-		init: function(element,idx){
-			this._el = element; //d3 selection
-			this._ball = false;
-			this._position = element.property('dataset').position;
-			this._team = element.property('dataset').team;
-			this._out = false;
-			this._inZone = true;
-			
-			element.map(function(d,i){ 
-				if(typeof(d)==='undefined'){
-					d = {};
-				}
-				d.idx=idx;
-				return d;
-			});
-		},
-		motion: {},
-		move: function(pos){
-			var p = this._el,
-				b = this._ball,
-				r = +p.attr('r'),
-				dir = (this._team==0)? 1: -1;
-								
-			p.attr('cx',pos.x).attr('cy',pos.y);
-			if (b){
-				b = this._ball._el;
-				b.attr('cy',pos.y+dir*r*0.8);
-				b.attr('cx',pos.x+dir*r*0.8);
-			}
-			if (this._team == 0){
-				if (+pos.x < 11){
-					this._inZone = true;
-				} else {
-					this._inZone = false;
-				}
-			} else {
-				if (+pos.x > 33){
-					this._inZone = true;
-				} else {
-					this._inZone = false;
-				}
-			}
-		},
-		travel: function(direction){
-			var pos = {x: +this._el.attr('cx'), y: +this._el.attr('cy') },
-				newpos = {x: pos.x, y: pos.y},
-				p = this._el,
-				speed = 0.15,
-				arrow = key.arrow,
-				b = this._ball;
-			direction = +direction;
-			
-			switch (direction){
-				case arrow.up:
-					newpos.y -= speed;
-					break;
-				case arrow.down:
-					newpos.y += speed;
-					break;
-				case arrow.left:
-					newpos.x -= speed;
-					break;
-				case arrow.right:
-					newpos.x += speed;
-					break;
-			}
-			this.move(newpos);
-		},
-		pickup: function(ball){
-			var dir = dir = (this._team==0)? 1: -1;
-			if (ball._motion !== false){
-				clearInterval(ball._motion.intvl)
-				ball._motion = false;
-			}
-			ball._attached = this;
-			this._ball = ball;
-			var p = this._el;
-			ball._el.attr('cy',parseFloat(p.attr('cy'))+dir*parseFloat(p.attr('r'))*0.8)
-			ball._el.attr('cx',parseFloat(p.attr('cx'))+dir*parseFloat(p.attr('r'))*0.8)
-		},
-		toss: function(x, y){
-			var ball = this._ball;
-			this._ball = false;
-			ball.toss(this,x,y);
-		},
 		hit:  function(){
 			var t = this;
 			this._out = true;
@@ -965,14 +974,6 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 		}
 	}),
 	Ball = Class.extend({
-		init: function(elm){
-			this._attached = false;
-			this._el = elm;
-			this._motion=false;
-		},
-		attached: function(){
-			return this._attached;
-		},
 		toss: function(from, x, y){
 			var thisBall = this,
 				time = 150,
@@ -1003,43 +1004,14 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 	})
 
 	
-	function collision(el1,el2){
-		var x1 = +el1._el.attr('cx'),
-			x2 = +el2._el.attr('cx'),
-			y1 = +el1._el.attr('cy'),
-			y2 = +el2._el.attr('cy'),
-			r1 = +el1._el.attr('r'),
-			r2 = +el2._el.attr('r');
-		return !!(Math.sqrt(( x2-x1 ) * ( x2-x1 )  + ( y2-y1 ) * ( y2-y1 ) ) <= ( r1 + r2 ));
-	}
-	function newPlayer(p){
-		console.log('new player! ' +JSON.stringify(p));
-		var el = d3.select('.team'+p.t+' .'+posMap[p.p]+':eq('+p.i+'):not(.controlled)'); //select only selects first match (versus selectAll)
-		el.classed('controlled',true)//.property('dataset').uid = p.id;
-	}
-	function playerById(id){
-		return players[d3.selectAll('.player').filter(function(d,i){ return (this.dataset.uid == id); })[0][0].__data__.idx];
-	}
-	function getIndex(el,selector){
-		var idx=null;
-		d3.selectAll(selector).each(function(d,i){
-			if (el==this){
-				idx=i;
-				return;
-			}
-		});
-		return idx;
-	}
-	
+
 	function moveLoop(){
 			//var t1 = new Date(),
 			//	obs = ~~(1000/(t1-t0));
 			//t0 = t1;
 			
 			
-			/*
-				PLAYER MOTION
-			*/
+			//	PLAYER MOTION
 			var cur = { x: +me._el.attr('cx'), y: +me._el.attr('cy') },
 				position = '.'+me._el.property('dataset').position.toLowerCase();
 			if (position == '.keeper' || position == '.chaser'){
@@ -1075,10 +1047,8 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 			for (var i=0, l=players.length; i<l; i++){
 			
 			
-				/*
-					BLUDGER SECTION
-					and KNOCKOUT LOGIC
-				*/
+				//	BLUDGER SECTION
+				//	and KNOCKOUT LOGIC
 				for (var j=0, m=bludgers.length; j<m; j++){
 					if (bludgers[j]._motion !== false 							//"active"/"in the air"
 					&& bludgers[j]._motion.from._team !== players[i]._team //no friendly fire
@@ -1107,9 +1077,8 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 					}
 				}
 				
-				/*
-					QUAFFLE TIME
-				*/
+				
+				//	QUAFFLE TIME
 				if (players[i]._ball===false  //not holding a ball
 				&& (players[i]._position == 'chaser' //chaser or
 				  || players[i]._position=='keeper') //keeper
@@ -1129,9 +1098,8 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 				
 				
 				
-				/*
-					SNITCHY
-				*/
+				
+				//	SNITCHY
 				if (players[i]._position=='seeker'
 				&& players[i]._out ===false
 				&& collision(players[i],snitch)){
@@ -1207,5 +1175,6 @@ if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 	dispatch.bmv = function(d){
 		d3.selectAll('.'+ballMap[d.b]+':eq('+d.i+')').attr('cx',d.x).attr('cy',d.y);
 	};
+*/
 	
 })();
