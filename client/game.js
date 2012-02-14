@@ -90,10 +90,12 @@
 			getInputs: function(){
 				return [right-left,down-up];
 			},
-			onPickPlayer: function(el,cb){
-				d3.select(el).on('click',function(){
-					cb(d3.event);
-					return false;
+			onPickPlayer: function(cb){
+				d3.select(document).on('mousedown',function(){
+					if (typeof cb == 'function'){
+						cb(d3.event.x,d3.event.y);
+					}
+					d3.event.preventDefault();
 				})	
 			},
 			shoot: function(cb){
@@ -110,6 +112,7 @@
 			canvas,
 			c,
 			shootCB,
+			pickCB,
 			lStick = {
 				id: -1,
 				start: [0,0],
@@ -148,6 +151,10 @@
 			var width = window.innerWidth;
 			clear();
 			for (var i=0, l=e.changedTouches.length; i<l; i++){
+				if (typeof pickCB == 'function'){
+					pickCB(e.changedTouches[i].clientX,e.changedTouches[i].clientY);
+				}
+			
 				if (!~lStick.id && e.changedTouches[i].clientX <= width/2){
 					lStick.id = e.changedTouches[i].identifier;
 					lStick.start = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
@@ -217,10 +224,10 @@
 					return [(lStick.cur[0]-lStick.start[0])*0.1,(lStick.cur[1]-lStick.start[1])*0.1];
 				}
 			},
-			onPickPlayer: function(el,cb){
-				
+			onPickPlayer: function(cb){
+				pickCB = cb;
 			},
-			shoot: function(cb){
+			onShoot: function(cb){
 				shootCB = cb;
 			}
 		};
@@ -239,16 +246,15 @@
 		//Interface
 		return {
 			getInputs: function(){ return manager.getInputs(); },//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
-			shoot: function(cb){ return manager.shoot(cb); }
+			onShoot: function(cb){ return manager.onShoot(cb); },
+			onPickPlayer: function(cb,scale) { return manager.onPickPlayer(cb,scale); }
 		}
 	}();
 	
 	
 	
 	
-	var SVGisCoolforHavingaDOM = function(scale){
-		scale = scale || 1;
-	
+	var SVGisCoolforHavingaDOM = function(scale){	
 		var svg = d3.select('#game').append('svg').attr('height','99%').attr('width','100%'),
 			game = svg.append('g').attr('transform','scale('+scale+')'),
 			ballG,
@@ -381,10 +387,7 @@
 						.map(function(d,i){ d[2] = parseInt(i>6,10); return d; })
 						.attr('r',R[0])
 						.attr('cx',function(d,i){ return d[0] })
-						.attr('cy',function(d,i){ return d[1] })
-						.on('click',function(d,i){
-							d3.select(this).classed('me',true);
-						})
+						.attr('cy',function(d,i){ return d[1] });
 
 			},
 			display: function(state){
@@ -394,12 +397,18 @@
 					.attr('cy',function(d){ return d[1]; })
 					.classed('controlled',function(d,i){
 							return !!d[2];
+					})
+					.classed('out',function(d,i){
+						return !!d[3];
 					});
 				
 				ballG.selectAll('circle')
 					.data(state.b)
 					.attr('cx',function(d){ return d[0] })
 					.attr('cy',function(d){ return d[1] });
+			},
+			destroy: function(){
+				d3.select('svg').remove();
 			}
 		}
 	},
@@ -422,7 +431,6 @@
 		buffer.height=canvas.height;
 		canvas.id='movement';
 		
-		scale = scale || 1;
 		b.scale(scale,scale);
 		var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
 		if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
@@ -588,10 +596,18 @@
 				//players
 				b.lineWidth = 2;
 				b.fillStyle='red';
+				
+				var temp;
 				for (var i=0, l=state.p.length; i<l; i++){
 					if (i>6){
 						b.fillStyle='blue';
+					} else {
+						b.fillStyle='red';
 					}
+					if (!state.p[i][2]){
+						b.fillStyle='#505050';
+					}
+					b.globalAlpha = (state.p[i][2]) ? ((state.p[i][3]) ? 0.3 : 1 ) : 0.5;
 					b.strokeStyle = posMap[pos[i%7]];
 					b.beginPath();
 					b.arc(state.p[i][0],state.p[i][1],R[0],0,Math.PI*2);
@@ -604,7 +620,7 @@
 					ymax = ((state.p[i][1]+R[0]+2) > ymax) ? (state.p[i][1]+R[0]+2) : ymax;
 					ymin = ((state.p[i][1]-R[0]-2) < ymin) ? (state.p[i][1]-R[0]-2) : ymin;
 				}
-				
+				b.globalAlpha=1;
 				
 				//balls
 				b.fillStyle='white';
@@ -648,24 +664,147 @@
 				ymax = Math.min(~~ymax,window.innerHeight);
 				
 				box = [xmin*scale,ymin*scale,xmax*scale,ymax*scale];
+			},
+			destroy: function(){
+				container.removeChild(canvas);
+				container.removeChild(buffer);
 			}
 		}	
 	},
-	Renderer = function(override){	//can add Canvas, or HTML+CSS later
-		var manager,
-			scale=1.5;
+	WebGLForFunsies = function(scale){
+		var API = {},
+			width = window.innerWidth,
+			height = window.innerHeight,
+			aspect = width/height,
+			angle=45,
+			near = 0.1,
+			far = 10000,
+			container = document.getElementById('game'),
+			renderer = new THREE.WebGLRenderer({antialias:true}),
+			camera = new THREE.PerspectiveCamera(angle,aspect,near,far),
+			scene = new THREE.Scene();
+		
+		
+		renderer.setSize(width,height);
+		renderer.domElement.id='THREE';
+		container.appendChild(renderer.domElement);
+		
+		var debugaxis = function(axisLength){
+		    //Shorten the vertex function
+		    function v(x,y,z){ 
+		            return new THREE.Vertex(new THREE.Vector3(x,y,z)); 
+		    }
+		    
+		    //Create axis (point1, point2, colour)
+		    function createAxis(p1, p2, color){
+		            var line, lineGeometry = new THREE.Geometry(),
+		            lineMat = new THREE.LineBasicMaterial({color: color, linewidth: 1});
+		            lineGeometry.vertices.push(p1, p2);
+		            line = new THREE.Line(lineGeometry, lineMat);
+		            scene.add(line);
+		    }
+		    
+		    createAxis(v(-axisLength, 0, 0), v(axisLength, 0, 0), 0xFF0000);
+		    createAxis(v(0, -axisLength, 0), v(0, axisLength, 0), 0x00FF00);
+		    createAxis(v(0, 0, -axisLength), v(0, 0, axisLength), 0x0000FF);
+		};
+
+		
+		var sphere;
+		API = {
+			init: function(start){
+				var field = start.field,
+					rad = 4,
+					mat = new THREE.MeshLambertMaterial({color: 0x6ac06e, ambient: 0xeeeeee}),
+					ballmat = new THREE.MeshLambertMaterial({color: 0xff0000, ambient: 0xffffff}),
+					linemat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 5}),
+					midlineGeo = new THREE.Geometry(),
+					pointLight = new THREE.PointLight(0XFAB65A,1),
+					sphere = new THREE.Mesh(new THREE.SphereGeometry(rad,32,32),ballmat),
+					sphere2 = new THREE.Mesh(new THREE.SphereGeometry(rad,32,32),ballmat);
+				plane = new THREE.Mesh(new THREE.PlaneGeometry(field.bounds[1],field.bounds[0],32,32),mat);
+				midlineGeo.vertices.push(new THREE.Vertex(new THREE.Vector3(150,0,0)),new THREE.Vertex(new THREE.Vector3(-150,0,0)));
+				var midline = new THREE.Line(midlineGeo,linemat);
+				
+				
+				//sideline view
+				camera.position.y =10;
+				camera.position.z = 10;
+				camera.position.x = -280;
+				camera.rotation.y=-90*Math.PI/180;
+				
+				
+				/*
+				//positive Z player view
+				camera.position.y = 4;
+				camera.position.z=220;
+				camera.position.x = 0;
+				camera.rotation.y=0;
+				*/
+				
+				
+				
+				plane.rotation.x = -90*Math.PI/180;
+				midline.rotation.x = -45*Math.PI/180;
+				
+				sphere.position.z=field.bounds[0]/2-field.playerStart;
+				sphere.position.y=rad;
+				sphere.position.x=10;
+				
+				sphere2.position.z=-field.bounds[0]/2+field.playerStart;
+				sphere2.position.y=rad;
+				sphere2.position.x=10;
+				
+				pointLight.position.x = 50;
+				pointLight.position.y = 400;
+				pointLight.position.z = 100;
+				scene.add(pointLight);
+				scene.add(sphere);
+				scene.add(sphere2);
+				scene.add(plane);
+				scene.add(midline);
+				scene.add(new THREE.AmbientLight(0x333333));
+				
+				
+				//To use enter the axis length
+				debugaxis(400);
+				
+				
+				
+				renderer.render(scene,camera);
+
+			},
+			display: function(state,dt){
+				//camera.position.z -= 0.2;
+				//renderer.render(scene,camera);
+			},
+			destroy: function(){
+				var game = document.getElementById('game');
+				game.removeChild(game.getElementsById('THREE'));
+			}
+		}
+		return API;
+	}
+	Renderer = function(scale,override){	//can add Canvas, or HTML+CSS later
+		var manager;
+		if (typeof scale == 'undefined'){
+			scale = 1;
+		}
+		
 		if (typeof override =='function'){
 			manager=override(scale);
 		} else {
 			manager=SVGisCoolforHavingaDOM(scale);
 		}
 		
+		
 		//Interface
 		return {
 			init: function(field){ return manager.init(field); }, //draw field and initial state
-			display: function(state){ return manager.display(state); }
+			display: function(state,dt){ return manager.display(state,dt); },
+			destroy: function(){ return manager.destroy(); }
 		}
-	}(CanvasIsFasterThough);
+	};
 	
 	
 	
@@ -683,8 +822,8 @@
 			});
 			return {
 				connected: true,
-				send: function(m){
-					sock.send(JSON.stringify(m));
+				send: function(type,msg){
+					sock.send(JSON.stringify({t:type, d:msg}));
 				},
 				on: function(evt,cb){
 					dispatch[evt] = cb;
@@ -702,55 +841,68 @@
 	};
 	
 	var Engine = function(){
-		var defState = {},
-			curState = {},
+		var state = {},
 			positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
-			players = [],
 			speed=1,
-			balls = [],
-			R = [5.2, 3, 2, 1]; //Radius of [player,quaffle,bludger,snitch]
-							//2.2 shoulder length, 8.3 armspan,
-			
-		//set up players in default positions
-		var x=78,
-			y,
-			t=0;
-		for (var i=0; i<14; i++){
-			if (i>6){
-				x=362;
-				t=1;
+			self,
+			dimensions = {
+							bounds: [440,300], //44m by 30m ellipse
+							keepZone: 110, //distance from edge
+							playerStart: 78,
+							goalLine: 55,
+							goals: [127,150,173], //y position along the goal line
+							goalHeights: [9,18,14],	//heights, in order
+							goalDiam: 10,
+							R:[5.2, 3, 2, 1] //Radius of [player,quaffle,bludger,snitch]
+							//2.2 shoulder length, 8.3 armspan, 
+						};
+		function reset(){
+			var players=[],
+				balls=[];
+				
+						
+			//set up players in default positions
+			var x=78,
+				y,
+				t=0;
+			for (var i=0; i<14; i++){
+				if (i>6){
+					x=362;
+					t=1;
+				}
+				y = 90+20*(i%7);
+				players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
 			}
-			y = 90+20*(i%7);
-			players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
-		}
-		//set up balls
-		x=220;
-		for (var i=0; i<5; i++){
-			switch(i){
-				case 0:
-					y=135;
-					break;
-				case 1:
-					y=75;
-					break;
-				case 2:
-					y=165;
-					break;
-				case 3:
-					y=225;
-					break;
-				case 4:
-					y=150;
-					break;
+			//set up balls
+			x=220;
+			for (var i=0; i<5; i++){
+				switch(i){
+					case 0:
+						y=135;
+						break;
+					case 1:
+						y=75;
+						break;
+					case 2:
+						y=165;
+						break;
+					case 3:
+						y=225;
+						break;
+					case 4:
+						y=150;
+						break;
+				}
+				if (i<4){
+					balls[i]=new Ball([x,y],[0,0],i);
+				} else {
+					balls[i] = new Snitch([x,y],[0,0]);
+				}
 			}
-			if (i<4){
-				balls[i]=new Ball([x,y],[0,0],i);
-			} else {
-				balls[i] = new Snitch([x,y],[0,0]);
-			}
+			return {b:balls, p:players};
 		}
 		
-		defState = {b:clone(balls),p:clone(players)};
+		state = reset();
 
 		
 		
@@ -763,13 +915,27 @@
 			this.out= !!o; //undefined sets to false
 			this.hold= (typeof h == 'undefined')? 6 : +h;	//6 is not being held
 			this.controlled = !!c;
-			this.r = R[0];
-			this.inZone = function(){
-				if (team==1){
-					return !!(this.loc[0] > 440-110);	
+			this.r = dimensions.R[0];
+		}
+		Player.prototype.inZone = function(){
+			if (this.team==1){
+				return !!(this.loc[0] > dimensions.bounds[0]-dimensions.keepZone);	
+			} else {
+				return !!(this.loc[0] < dimensions.keepZone);
+			}		
+		}
+		Player.prototype.atHoops = function(){
+			if (this.loc[1] > dimensions.goals[0]-dimensions.goalDiam/2-dimensions.R[0] 
+			&& this.loc[1] < dimensions.goals[2]+dimensions.goalDiam/2+dimensions.R[0]){
+				if (this.team==1){
+					return !!(this.loc[0] > dimensions.bounds[0]-dimensions.goalLine-dimensions.R[0] 
+							&& this.loc[0] < dimensions.bounds[0]-dimensions.goalLine+dimensions.R[0]);
 				} else {
-					return !!(this.loc[0] < 110);
+					return !!(this.loc[0] > dimensions.goalLine-dimensions.R[0]
+							&& this.loc[0] < dimensions.goalLine+dimensions.R[0]);
 				}
+			} else {
+				return false;
 			}
 		}
 		function Ball(l,v,i,h,d,t,g){
@@ -781,15 +947,15 @@
 			this.thrower=(typeof t =='undefined')? -1: +t;
 			this.ignore= g || [];
 			if (i==1){
-				this.r = R[1];
+				this.r = dimensions.R[1];
 			} else {
-				this.r = R[2];
+				this.r = dimensions.R[2];
 			}
 		}
 		function Snitch(l,v){
 			this.loc=l;
 			this.velo=v;
-			this.r = R[3];
+			this.r = dimensions.R[3];
 		}
 	
 		
@@ -803,7 +969,7 @@
 				g=[];
 			
 			
-			for (var i=0, l=s.b.length; i<l; i++){
+			for (var i=0, l=b.length; i<l; i++){
 				k = b[i];
 				g=[];
 				if (i<4){
@@ -817,7 +983,7 @@
 					e.b[i] = new Snitch([k[0],k[1]],[k[2],k[3]]);
 				}
 			}
-			for (var i=0, l=s.p.length; i<l; i++){
+			for (var i=0, l=p.length; i<l; i++){
 				k = p[i];
 				if (i>6){
 					t=1;
@@ -834,64 +1000,78 @@
 			}
 		}
 		function collision(a,b){
-			return !!(Math.sqrt(( b[0]-a[0] ) * ( b[0]-a[0] )  + ( b[1]-a[1] ) * ( b[1]-a[1] ) ) <= ( a.r + b.r ));
+			return !!(Math.sqrt(( b.loc[0]-a.loc[0] ) * ( b.loc[0]-a.loc[0] )  + ( b.loc[1]-a.loc[1] ) * ( b.loc[1]-a.loc[1] ) ) <= ( a.r + b.r ));
 		}
 		
 		
 		return {
 			init: function(){
 				var that=this;
-				this.reset();
 				return {
-						field: {
-							bounds: [440,300], //44m by 30m ellipse
-							keepZone: 110, //distance from edge
-							playerStart: 78,
-							goalLine: 55,
-							goals: [127,150,173], //y position along the goal line
-							goalHeights: [9,18,14],	//heights, in order
-							goalDiam: 10,
-							R:R 
-						},
+						field: dimensions,
 						positions: positions,
 						state: that.getState()
 					};
 			},
-			reset: function(){ //initial state
-				curState = clone(defState);
-				return this.getState();
-			},
 			apply: function(input){ //input is force changes on object
-				curState.p[1].velo[0] = bound(input[0]);
-				curState.p[1].velo[1] = bound(input[1]);
+				if (typeof self === 'number'){
+					state.p[self].velo[0] = bound(input[0]);
+					state.p[self].velo[1] = bound(input[1]);
+				}
 			},
 			update: function(){
-				for (var i=0, l=curState.p.length; i<l; i++){
-					curState.p[i].loc[0] += speed*curState.p[i].velo[0];
-					curState.p[i].loc[1] += speed*curState.p[i].velo[1];
+				for (var i=0, l=state.p.length; i<l; i++){
+					//move
+					state.p[i].loc[0] += speed*state.p[i].velo[0];
+					state.p[i].loc[1] += speed*state.p[i].velo[1];
+					
+					//round
+					state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
+					state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
+					
+					
+					if (state.p[i].out && state.p[i].atHoops()){
+						state.p[i].out=false;
+					}					
 				}
 				return this.getState();
 			},
 			setState: function(newState){
-				curState = expand(newState);
+				state = expand(newState);
 				return this.getState();
 			},
 			getState: function(){
 				var view = {b:[],p:[]};
-				for (var i=0, l=curState.p.length; i<l; i++){
-					view.p[i] = [curState.p[i].loc[0],curState.p[i].loc[1],+curState.p[i].controlled];
+				for (var i=0, l=state.p.length; i<l; i++){
+					view.p[i] = [state.p[i].loc[0],state.p[i].loc[1],+state.p[i].controlled,+state.p[i].out];
 				}
-				for (var i=0, l=curState.b.length; i<l; i++){
-					view.b[i] = [curState.b[i].loc[0],curState.b[i].loc[1]];
+				for (var i=0, l=state.b.length; i<l; i++){
+					view.b[i] = [state.b[i].loc[0],state.b[i].loc[1]];
 				}
 				return view;
+			},
+			playerSelect: function (x,y){
+				for (var i=0, l=state.p.length; i<l; i++){
+					if (!state.p[i].controlled && collision(state.p[i],{loc:[x,y], r:dimensions.R[0]})){
+						return i;
+					}
+				}
+				return false;
+			},
+			assign: function(i){
+				self =i;
+				state.p[self].controlled=true;
 			}
 		}
 	}();
 	
 	var Controller = function(){
-		Renderer.init(Engine.init());
+		var scale = 1.5;
+	
+		Renderer = Renderer(scale)//,CanvasIsFasterThough);
 		Network = Network();
+
+		Renderer.init(Engine.init());
 		Network.on('w',function(d){ //welcome
 				if (d=='f'){
 					alert('This game is currently full! You can watch until the next game begins, though!')
@@ -902,39 +1082,54 @@
 			.on('s',function(d){ //state
 				Renderer.display(Engine.setState(d));
 			})
-			.on('ca',function(d){ //claim answer
-			
-			})
-			.on('np',function(d){ //new player(s)
-			
-			})
 			.on('b',function(d){ //ball action (not movement)
 			
 			});
-		
+		var pickHandler = function(x,y){
+			var chosen = Engine.playerSelect(x/scale,y/scale);
+			if (Network.connected){
+				Network.send('claim',chosen);
+				Network.on('ca',function(d){
+					if (d.a==1){
+						Engine.assign(chosen);
+						InputManager.onPickPlayer(function(){});
+					} else if (d.a==0){
+						alert('Woops! that position is taken, please pick again');
+					} else {
+						alert('Sorry! This game is full now, but you can watch this game until the next begins, or a player drops out');
+						InputManager.onPickPlayer(function(){});
+					}
+				})
+			} else { //play by yourself for funsies
+				InputManager.onPickPlayer(function(){});
+				Engine.assign(chosen);
+			}
+		};
+		InputManager.onPickPlayer(pickHandler);
 	
-		function loop(){
+		function loop(t){
 			var velo = InputManager.getInputs(),
 				now = new Date().getTime(),
 				dt=0,
+				past;
 				
 			if (past){
-				dt = Math.min(1,(now-last)/1000);
+				dt = Math.min(1,(now-past)/1000);
 			}
 			Engine.apply(velo);
 			while (dt >= (1000/60)){
 				dt -= 1000/60;
 				Engine.update();
 			}
-			Renderer.display(Engine.update());
+			Renderer.display(Engine.update(),t);
 			past=now;
 			window.requestAnimationFrame(loop);
 		}
 		
 		return {
 			start: function(){
-				Renderer.display(Engine.reset());
-				loop();
+				Renderer.display(Engine.getState());
+				loop(new Date().getTime());
 			}
 		}
 	}();
@@ -1006,10 +1201,6 @@
 	
 
 	function moveLoop(){
-			//var t1 = new Date(),
-			//	obs = ~~(1000/(t1-t0));
-			//t0 = t1;
-			
 			
 			//	PLAYER MOTION
 			var cur = { x: +me._el.attr('cx'), y: +me._el.attr('cy') },

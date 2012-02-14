@@ -1,13 +1,9 @@
 var io = require('socket.io').listen(3050),
-	util = require('util'),
-	Class = require('./class.js').Class;
+	util = require('util');
 
-// Array Remove - By John Resig (MIT Licensed)
-Array.prototype.remove = function(from, to) {
-  var rest = this.slice((to || from) + 1 || this.length);
-  this.length = from < 0 ? this.length + from : from;
-  return this.push.apply(this, rest);
-};
+io.configure(function(){
+	io.set('log level',1);
+});
 
 function send(s,msg,broad){
 	if (broad){
@@ -17,166 +13,208 @@ function send(s,msg,broad){
 	}
 }
 
-var Entity = Class.extend({
-		init: function(){},
-		speedLimit: 0.15,
-		loc: {x: 0, y: 0},
-		onMove: function(coords,cb){ //cb is the callback function, first param as coordinates to send, second is whether move was successful
-			if (Math.abs(coords.x - this.loc.x) > speedLimit || Math.abs(coords.y - this.loc.y) > speedLimit){
-				cb(this.loc,false); //moved too fast, we're putting you back
+var players = [];
+
+var Engine = function(){
+	var state = {},
+		positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
+		speed=1,
+		dimensions = {
+						bounds: [440,300], //44m by 30m ellipse
+						keepZone: 110, //distance from edge
+						playerStart: 78,
+						goalLine: 55,
+						goals: [127,150,173], //y position along the goal line
+						goalHeights: [9,18,14],	//heights, in order
+						goalDiam: 10,
+						R:[5.2, 3, 2, 1] //Radius of [player,quaffle,bludger,snitch]
+						//2.2 shoulder length, 8.3 armspan, 
+					};
+	
+	function reset(){
+		var players=[],
+			balls=[];
+	
+		//set up players in default positions
+		var x=78,
+			y,
+			t=0;
+		for (var i=0; i<14; i++){
+			if (i>6){
+				x=362;
+				t=1;
+			}
+			y = 90+20*(i%7);
+			players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
+		}
+		//set up balls
+		x=220;
+		for (var i=0; i<5; i++){
+			switch(i){
+				case 0:
+					y=135;
+					break;
+				case 1:
+					y=75;
+					break;
+				case 2:
+					y=165;
+					break;
+				case 3:
+					y=225;
+					break;
+				case 4:
+					y=150;
+					break;
+			}
+			if (i<4){
+				balls[i]=new Ball([x,y],[0,0],i);
 			} else {
-				this.loc.x = coords.x;
-				this.loc.y = coords.y.
-				cb(coords,true); //send out!
+				balls[i] = new Snitch([x,y],[0,0]);
 			}
 		}
-	}),
-	Player = Entity.extend({
-		init: function(team,p){
-			this.team = team;
-			this.position = p;
-			this.claimed = false;
-		},
-		claim: function(sock){
-			this.sock = sock;
-			this.claimed=true;
-		},
-		radius: 0.7
-	}),
-	Chaser = Player.extend({
-		init: function(team){
-			this._super(team,'c');
-		}
-	}),
-	Keeper = Player.extend({
-		init: function(team){
-			this._super(team,'k');
-		}
-	}),
-	Beater = Player.extend({
-		init: function(team){
-			this._super(team,'b');
-		}
-	}),
-	Seeker = Player.extend({
-		init: function(team){
-			this._super(team,'s');
-		}
-	}),
-	Ball = Entity.extend({
-		//new speedLimit
-	}),
-	Quaffle = Ball.extend({
-		radius: 0.4
-	}),
-	Bludger = Ball.extend({
-		radius: 0.3
-	}),
-	Snitch = Entity.extend({
-		radius: 0.1
-	}),
-	players = [
-				{
-					k: [new Keeper(0)],
-					b: [new Beater(0), new Beater(0)],
-					c: [new Chaser(0),new Chaser(0), new Chaser(0)],
-					s: [new Seeker(0)]
-				},
-				{
-					k: [new Keeper(1)],
-					b: [new Beater(1), new Beater(1)],
-					c: [new Chaser(1), new Chaser(1), new Chaser(1)],
-					s: [new Seeker(1)]
-				},
-			],
-	state = {},
-	dispatch = {};
-
-
-dispatch.claim = function(d){
-	if (!(d.t === 0 || d.t === 1) && !players[0].hasOwnProperty(d.p)){		
-		send(this,{t:'ca',d:{a: 0}}); //improper claim format, reject 
-		return;
+		return {b:balls, p:players};
 	}
 	
-	if (players[d.t][d.p][d.i].claimed===false){
-		players[d.t][d.p][d.i].claim(this);
-		d.a=1;
-		send(this,{t:'ca',d:d}); //claim accepted
-		send(this,{t:'np', d:[d]},true);
-		this.set('id',d);			
-	} else {
-		for(var i=0; i<players.length; i++){
-			for (var pos in players[i]){
-				if (players[i].hasOwnProperty(pos)){
-					for (var j=0, l=players[i][pos].length; j<l; j++){
-						if (players[i][pos][j].claimed!==false){
-							send(this,{t:'ca',d:{a:0}}); //your pick is gone, but there are some open
-							return;
-						}
-					}
+	state = reset();
+
+	
+	
+	function Player(p,l,v,t,i,o,h,c){
+		this.loc = l;
+		this.position=p;
+		this.velo = v;
+		this.team = t;
+		this.idx = i;
+		this.out= !!o; //undefined sets to false
+		this.hold= (typeof h == 'undefined')? 6 : +h;	//6 is not being held
+		this.controlled = !!c;
+		this.r = dimensions.R[0];
+	}
+	Player.prototype.inZone = function(){
+		if (this.team==1){
+			return !!(this.loc[0] > dimensions.bounds[0]-dimensions.keepZone);	
+		} else {
+			return !!(this.loc[0] < dimensions.keepZone);
+		}		
+	}
+	Player.prototype.atHoops = function(){
+		if (this.loc[1] > dimensions.goals[0]-dimensions.goalDiam/2-dimensions.R[0] 
+		&& this.loc[1] < dimensions.goals[2]+dimensions.goalDiam/2+dimensions.R[0]){
+			if (this.team==1){
+				return !!(this.loc[0] > dimensions.bounds[0]-dimensions.goalLine-dimensions.R[0] 
+						&& this.loc[0] < dimensions.bounds[0]-dimensions.goalLine+dimensions.R[0]);
+			} else {
+				return !!(this.loc[0] > dimensions.goalLine-dimensions.R[0]
+						&& this.loc[0] < dimensions.goalLine+dimensions.R[0]);
+			}
+		} else {
+			return false;
+		}
+	}
+	function Ball(l,v,i,h,d,t,g){
+		this.loc=l;
+		this.velo = v;
+		this.idx=i;
+		this.hold= (typeof h =='undefined')? -1 : +h;
+		this.dead= !!d;
+		this.thrower=(typeof t =='undefined')? -1: +t;
+		this.ignore= g || [];
+		if (i==1){
+			this.r = dimensions.R[1];
+		} else {
+			this.r = dimensions.R[2];
+		}
+	}
+	function Snitch(l,v){
+		this.loc=l;
+		this.velo=v;
+		this.r = dimensions.R[3];
+	}
+	
+	function compact(){
+		var e = {b:[],p:[]},
+			k;
+		for (var i=0, l=state.b.length; i<l; i++){
+			k = state.b[i];
+			if (i<4){
+				e.b.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1],i,+k.hold,+k.dead,+k.thrower]);
+				for (var j=0, m=k.ignore.length; j<m; j++){
+					e.b[i].push(k.ignore[j])
 				}
+			} else {
+				e.b.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1]])
 			}
 		}
-		send(this,{t:'ca',d:-1}); //all positions taken!
+		for (var i=0, l=state.p.length; i<l; i++){
+			k = state.p[i];
+			e.p.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1],i,+k.out,+k.hold,+k.controlled]);
+		}
+		return e;
 	}
-}	
-dispatch.move = function(d){
-	var sock = this;
-	sock.get('id',function(e,id){;
-		send(sock,{t:'mv', d: {x:d.x, y:d.y, i:id.i, t:id.t, p:id.p}},true);
-	});
-}
-dispatch.toss = function(d){
-	send(this,{t:'t', d: d},true);	
-}
-dispatch.ballmove = function(d){
-	send(this,{t:'bmv', d: d},true);
-}
+	
+	function bound(x){
+		if (x<0){
+			return Math.max(-1,x);
+		} else {
+			return Math.min(1,x);
+		}
+	}
+	function collision(a,b){
+		return !!(Math.sqrt(( b.loc[0]-a.loc[0] ) * ( b.loc[0]-a.loc[0] )  + ( b.loc[1]-a.loc[1] ) * ( b.loc[1]-a.loc[1] ) ) <= ( a.r + b.r ));
+	}
+	
+	
+	return {
+		init: function(){
+			var that=this;
+			return {
+					field: dimensions,
+					positions: positions,
+					state: that.getState()
+				};
+		},
+		apply: function(input){ //input is force changes on object
+			if (typeof self === 'number'){
+				state.p[self].velo[0] = bound(input[0]);
+				state.p[self].velo[1] = bound(input[1]);
+			}
+		},
+		update: function(){
+			for (var i=0, l=state.p.length; i<l; i++){
+				//move
+				state.p[i].loc[0] += speed*state.p[i].velo[0];
+				state.p[i].loc[1] += speed*state.p[i].velo[1];
+				
+				//round
+				state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
+				state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
+				
+				
+				if (state.p[i].out && state.p[i].atHoops()){
+					state.p[i].out=false;
+				}					
+			}
+			return this.getState();
+		},
+		getState: function(){
+			var view = {b:[],p:[]};
+			for (var i=0, l=state.p.length; i<l; i++){
+				view.p[i] = [state.p[i].loc[0],state.p[i].loc[1],+state.p[i].controlled,+state.p[i].out];
+			}
+			for (var i=0, l=state.b.length; i<l; i++){
+				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1]];
+			}
+			return view;
+		}
+	}
+}();
 
-io.configure(function(){
-	io.set('log level',1);
+
+io.sockets.on('connection',function(sock){
+	
 });
 
-/*
- * Messages:
- *	w: welcome
- *	np: new player
- *
- */
-io.sockets.on('connection',function(sock){
-	/*
-	for (var key in sock){
-		console.log(key+": "+sock[key]);
-	}
-	*/
-	var nps = [];
-	for(var i=0; i<players.length; i++){
-		for (var pos in players[i]){
-			if (players[i].hasOwnProperty(pos)){
-				for (var j=0, l=players[i][pos].length; j<l; j++){
-					if (players[i][pos][j].claimed!==false){
-						nps.push({p: pos, t:i, i:j});
-					}
-				}
-			}
-		}
-	}
-	if (nps.length == 14){
-		console.log('New connection - Game already full');
-		send(sock,{t:'w', d: 'f'});
-	} else {		
-		if (nps.length){
-			send(sock,{t:'np', d: nps});
-		}
-		send(sock,{t:'w',d:'aok'});
-		console.log('New connection - positions open');
-		
-		sock.on('message',function(d){
-			d = JSON.parse(d);
-			if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
-				dispatch[d.t].call(sock,d.d);
-			}
-		});
-	}
+io.sockets.on('disconnect',function(sock){
+
 });
