@@ -59,6 +59,7 @@ var Controller = function(){
 		}
 		Renderer.display(Engine.update(dt));
 		past = t;
+		stats.update();
 		window.requestAnimationFrame(loop);
 	}
 	
@@ -69,4 +70,12 @@ var Controller = function(){
 		}
 	}
 }();
+
+var stats = new Stats();
+// Align top-left
+stats.getDomElement().style.position = 'absolute';
+stats.getDomElement().style.left = '0px';
+stats.getDomElement().style.top = '0px';	
+document.body.appendChild( stats.getDomElement() );
+
 Controller.start();	

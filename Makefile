@@ -18,7 +18,6 @@ client/game.js: \
 	src/Network.js \
 	src/Engine.js \
 	src/Controller.js \
-	src/Stats.js \
 	src/end.js 
 
 
