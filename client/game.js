@@ -21,7 +21,8 @@
 			up=0,
 			down=0,
 			API = {},
-			shootCB;
+			shootCB,
+			changeCB;
 		d3.select(document).on('keydown', function(){
 			var e = d3.event,
 				prevent=false;
@@ -54,6 +55,7 @@
 		    		break;
 		    }
 		    if (prevent){
+		    	changeCB([right-left,down-up]);
 		   		e.preventDefault();
 		   	}
 		});
@@ -83,12 +85,16 @@
 		    		break;
 		    }
 		    if (prevent){
+		    	changeCB([right-left,down-up]);
 		   		e.preventDefault();
 		   	}
 		});
 		API = {
 			getInputs: function(){
 				return [right-left,down-up];
+			},
+			onChange: function(cb){
+				changeCB = cb;
 			},
 			onPickPlayer: function(cb){
 				d3.select(document).on('mousedown',function(){
@@ -113,6 +119,7 @@
 			c,
 			shootCB,
 			pickCB,
+			changeCB,
 			lStick = {
 				id: -1,
 				start: [0,0],
@@ -180,6 +187,7 @@
 					circle(lStick.start[0],lStick.start[1],30,moveColor);
 					circle(lStick.start[0],lStick.start[1],40,moveColor);
 					circle(lStick.cur[0],  lStick.cur[1],  30,moveColor);
+					changeCB([(lStick.cur[0]-lStick.start[0])*0.1,(lStick.cur[1]-lStick.start[1])*0.1]);
 					continue;
 				} else if (!!~rStick.id && e.changedTouches[i].identifier == rStick.id){
 					rStick.cur = [e.changedTouches[i].clientX,e.changedTouches[i].clientY];
@@ -197,6 +205,7 @@
 					lStick.id=-1;
 					lStick.start =[0,0];
 					lStick.cur = lStick.start;
+					changeCB([0,0]);
 					continue;
 				} else if (e.changedTouches[i].identifier == rStick.id){
 					if (typeof shootCB == 'function'){
@@ -227,6 +236,9 @@
 			onPickPlayer: function(cb){
 				pickCB = cb;
 			},
+			onChange: function(cb){
+				changeCB = cb;
+			},
 			onShoot: function(cb){
 				shootCB = cb;
 			}
@@ -246,6 +258,7 @@
 		//Interface
 		return {
 			getInputs: function(){ return manager.getInputs(); },//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
+			onChange: function(cb){ return manager.onChange(cb); },
 			onShoot: function(cb){ return manager.onShoot(cb); },
 			onPickPlayer: function(cb,scale) { return manager.onPickPlayer(cb,scale); }
 		}
@@ -409,29 +422,28 @@
 			},
 			destroy: function(){
 				d3.select('svg').remove();
+			},
+			out: function(idx){
+				var player = playG.selectAll('.player').filter(function(d,i){ return i==idx; }).classed('out',true);
+				var flashy = setInterval(function(){ player.classed('flash',!player.classed('flash')); },100);
+				setTimeout(function(){ clearInterval(flashy); player.classed('flash',false); },1000);
 			}
 		}
 	},
-	CanvasIsFasterThough = function(scale){
+	CanvasIsOddlyPopular = function(scale){
 		var container = document.getElementById('game'),
 			canvas = document.createElement( 'canvas' ),
-			c = canvas.getContext( '2d' ),
-			buffer = document.createElement('canvas'),   //draw off screen, then copy result
-			b = buffer.getContext('2d'), 
+			c = canvas.getContext( '2d' ), 
 			pos,
 			posMap = {seeker:'gold',chaser:'white',beater:'black',keeper:'lime'},
 			R=[],										//radii of objects
 			box=[];										//active bounding box
 		container.appendChild(canvas);	
 		
-	
-		canvas.width = window.innerWidth; 
-		canvas.height = window.innerHeight;
-		buffer.width = canvas.width;
-		buffer.height=canvas.height;
+		canvas.width = 1; 
+		canvas.height = 1;
 		canvas.id='movement';
 		
-		b.scale(scale,scale);
 		var CP = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
 		if(CP && CP.lineTo) CP.dashedLine = function(x, y, x2, y2, dashArray){
 		    if(! dashArray) dashArray=[10,5];
@@ -474,10 +486,13 @@
 				pos=start.positions;
 				R=field.R;
 				
+				canvas.width = field.bounds[0]*scale; 
+				canvas.height =field.bounds[1]*scale;
+				c.scale(scale,scale);
+
 				
-				
-				pitch.width= window.innerWidth;
-				pitch.height=window.innerHeight;
+				pitch.width= field.bounds[0]*scale;
+				pitch.height=field.bounds[1]*scale;
 				pitch.id='pitch';
 				container.appendChild(pitch);
 				
@@ -573,7 +588,7 @@
 				ctx.strokeStyle='black';
 				for (var i=0, l=field.goals.length; i<l; i++){
 					ctx.beginPath();
-					ctx.moveTo(field.goalLine,field.goals[i]+r)
+					ctx.moveTo(field.goalLine,field.goals[i]+r);
 					ctx.quadraticCurveTo(field.goalLine+bow,field.goals[i],field.goalLine,field.goals[i]-r);
 					ctx.quadraticCurveTo(field.goalLine-bow,field.goals[i],field.goalLine,field.goals[i]+r);
 					ctx.stroke();
@@ -590,69 +605,67 @@
 			},
 			display: function(state){
 				var xmin=0,ymin=0,xmax=0,ymax=0;
-				b.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
 				c.clearRect(box[0],box[1],box[2]-box[0],box[3]-box[1]);
 				
 				//players
-				b.lineWidth = 2;
-				b.fillStyle='red';
+				c.lineWidth = 2;
+				c.fillStyle='red';
 				
 				var temp;
 				for (var i=0, l=state.p.length; i<l; i++){
 					if (i>6){
-						b.fillStyle='blue';
+						c.fillStyle='blue';
 					} else {
-						b.fillStyle='red';
+						c.fillStyle='red';
 					}
 					if (!state.p[i][2]){
-						b.fillStyle='#505050';
+						c.fillStyle='#505050';
 					}
-					b.globalAlpha = (state.p[i][2]) ? ((state.p[i][3]) ? 0.3 : 1 ) : 0.5;
-					b.strokeStyle = posMap[pos[i%7]];
-					b.beginPath();
-					b.arc(state.p[i][0],state.p[i][1],R[0],0,Math.PI*2);
-					b.closePath();
-					b.stroke();
-					b.fill();
+					c.globalAlpha = (state.p[i][2]) ? ((state.p[i][3]) ? 0.3 : 1 ) : 0.5;
+					c.strokeStyle = posMap[pos[i%7]];
+					c.beginPath();
+					c.arc(state.p[i][0],state.p[i][1],R[0],0,Math.PI*2);
+					c.closePath();
+					c.stroke();
+					c.fill();
 					
 					xmin = ((state.p[i][0]-R[0]-2) < xmin) ? (state.p[i][0]-R[0]-2) : xmin;
 					xmax = ((state.p[i][0]+R[0]+2) > xmax) ? (state.p[i][0]+R[0]+2) : xmax;
 					ymax = ((state.p[i][1]+R[0]+2) > ymax) ? (state.p[i][1]+R[0]+2) : ymax;
 					ymin = ((state.p[i][1]-R[0]-2) < ymin) ? (state.p[i][1]-R[0]-2) : ymin;
 				}
-				b.globalAlpha=1;
+				c.globalAlpha=1;
 				
 				//balls
-				b.fillStyle='white';
-				b.strokeStyle='black';
-				b.beginPath();
-				b.arc(state.b[0][0],state.b[0][1],R[1],0,Math.PI*2);
-				b.closePath();
-				b.stroke();
-				b.fill();
+				c.fillStyle='white';
+				c.strokeStyle='black';
+				c.beginPath();
+				c.arc(state.b[0][0],state.b[0][1],R[1],0,Math.PI*2);
+				c.closePath();
+				c.stroke();
+				c.fill();
 				xmin = ((state.b[0][0]-R[1]-2) < xmin) ? (state.b[0][0]-R[1]-2) : xmin;
 				xmax = ((state.b[0][0]+R[1]+2) > xmax) ? (state.b[0][0]+R[1]+2) : xmax;
 				ymax = ((state.b[0][1]+R[1]+2) > ymax) ? (state.b[0][1]+R[1]+2) : ymax;
 				ymin = ((state.b[0][1]-R[1]-2) < ymin) ? (state.b[0][1]-R[1]-2) : ymin;
 				
-				b.fillStyle='black';
+				c.fillStyle='black';
 				for (var i=1, l=state.b.length-1; i<l; i++){
-					b.beginPath();
-					b.arc(state.b[i][0],state.b[i][1],R[2],0,Math.PI*2);
-					b.closePath();
-					b.fill();
+					c.beginPath();
+					c.arc(state.b[i][0],state.b[i][1],R[2],0,Math.PI*2);
+					c.closePath();
+					c.fill();
 					xmin = ((state.b[i][0]-R[2]) < xmin) ? (state.b[i][0]-R[2]) : xmin;
 					xmax = ((state.b[i][0]+R[2]) > xmax) ? (state.b[i][0]+R[2]) : xmax;
 					ymax = ((state.b[i][1]+R[2]) > ymax) ? (state.b[i][1]+R[2]) : ymax;
 					ymin = ((state.b[i][1]-R[2]) < ymin) ? (state.b[i][1]-R[2]) : ymin;
 				}
 				
-				b.fillStyle='gold';
-				b.beginPath();
-				b.arc(state.b[4][0],state.b[4][1],R[3],0,Math.PI*2);
-				b.closePath();
-				b.fill();
-				c.drawImage(buffer,0,0);
+				c.fillStyle='gold';
+				c.beginPath();
+				c.arc(state.b[4][0],state.b[4][1],R[3],0,Math.PI*2);
+				c.closePath();
+				c.fill();
 				xmin = ((state.b[4][0]-R[3]) < xmin) ? (state.b[4][0]-R[3]) : xmin;
 				xmax = ((state.b[4][0]+R[3]) > xmax) ? (state.b[4][0]+R[3]) : xmax;
 				ymax = ((state.b[4][1]+R[3]) > ymax) ? (state.b[4][1]+R[3]) : ymax;
@@ -774,7 +787,7 @@
 				renderer.render(scene,camera);
 
 			},
-			display: function(state,dt){
+			display: function(state){
 				//camera.position.z -= 0.2;
 				//renderer.render(scene,camera);
 			},
@@ -790,19 +803,27 @@
 		if (typeof scale == 'undefined'){
 			scale = 1;
 		}
+		var e = document.createElement('div');
+		e.innerHTML = '<svg></svg>';
+		var svgTest = (e.firstChild && "namespaceURI" in e.firstChild && e.firstChild.namespaceURI == 'http://www.w3.org/2000/svg');
 		
 		if (typeof override =='function'){
 			manager=override(scale);
-		} else {
+		} else if (svgTest){
 			manager=SVGisCoolforHavingaDOM(scale);
+		} else {
+			manager=CanvasIsOddlyPopular(scale);
 		}
 		
 		
 		//Interface
 		return {
+			//Mandatory implementation
 			init: function(field){ return manager.init(field); }, //draw field and initial state
-			display: function(state,dt){ return manager.display(state,dt); },
-			destroy: function(){ return manager.destroy(); }
+			display: function(state){ return manager.display(state); },
+			destroy: function(){ return manager.destroy(); },
+			//Optional
+			out: function(i){ if (typeof manager.out == 'function'){ manager.out(i); } }
 		}
 	};
 	
@@ -814,7 +835,7 @@
 		if (typeof io !== 'undefined'){
 			sock = io.connect('/',{port: 3050});
 			sock.on('message',function(d){
-				console.log('msg: '+d);
+				//console.log('msg: '+d);
 				d = JSON.parse(d);
 				if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
 					dispatch[d.t](d.d);
@@ -840,7 +861,7 @@
 		}
 	};
 	
-	var Engine = function(){
+	var Engine = (function(){
 		var state = {},
 			positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
 			speed=1,
@@ -862,19 +883,19 @@
 				
 						
 			//set up players in default positions
-			var x=78,
+			var x=dimensions.playerStart,
 				y,
 				t=0;
 			for (var i=0; i<14; i++){
 				if (i>6){
-					x=362;
+					x=dimensions.bounds[0]-dimensions.playerStart;
 					t=1;
 				}
 				y = 90+20*(i%7);
 				players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
 			}
 			//set up balls
-			x=220;
+			x=dimensions.bounds[0]/2;
 			for (var i=0; i<5; i++){
 				switch(i){
 					case 0:
@@ -901,9 +922,6 @@
 			}
 			return {b:balls, p:players};
 		}
-		
-		state = reset();
-
 		
 		
 		function Player(p,l,v,t,i,o,h,c){
@@ -1007,6 +1025,7 @@
 		return {
 			init: function(){
 				var that=this;
+				state = reset();
 				return {
 						field: dimensions,
 						positions: positions,
@@ -1019,19 +1038,22 @@
 					state.p[self].velo[1] = bound(input[1]);
 				}
 			},
-			update: function(){
+			update: function(dt){
+				var factor = dt/(1000/60) || 1;
 				for (var i=0, l=state.p.length; i<l; i++){
-					//move
-					state.p[i].loc[0] += speed*state.p[i].velo[0];
-					state.p[i].loc[1] += speed*state.p[i].velo[1];
-					
-					//round
-					state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
-					state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
-					
-					
-					if (state.p[i].out && state.p[i].atHoops()){
-						state.p[i].out=false;
+					if (state.p[i].velo[0] || state.p[i].velo[1]){
+						//move
+						state.p[i].loc[0] += speed*factor*state.p[i].velo[0];
+						state.p[i].loc[1] += speed*factor*state.p[i].velo[1];
+						
+						//round
+						state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
+						state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
+						
+						
+						if (state.p[i].out && state.p[i].atHoops()){
+							state.p[i].out=false;
+						}
 					}					
 				}
 				return this.getState();
@@ -1063,66 +1085,69 @@
 				state.p[self].controlled=true;
 			}
 		}
-	}();
+	})();
 	
 	var Controller = function(){
 		var scale = 1.5;
 	
-		Renderer = Renderer(scale)//,CanvasIsFasterThough);
-		Network = Network();
-
+		Renderer = Renderer(scale);
 		Renderer.init(Engine.init());
+		
+		Network = Network();
 		Network.on('w',function(d){ //welcome
 				if (d=='f'){
 					alert('This game is currently full! You can watch until the next game begins, though!')
 				} else {
-					//can pick
+					InputManager.onPickPlayer(pickHandler);
 				}
 			})
 			.on('s',function(d){ //state
-				Renderer.display(Engine.setState(d));
+				Engine.setState(d);
 			})
 			.on('b',function(d){ //ball action (not movement)
 			
 			});
-		var pickHandler = function(x,y){
-			var chosen = Engine.playerSelect(x/scale,y/scale);
-			if (Network.connected){
-				Network.send('claim',chosen);
-				Network.on('ca',function(d){
-					if (d.a==1){
-						Engine.assign(chosen);
-						InputManager.onPickPlayer(function(){});
-					} else if (d.a==0){
-						alert('Woops! that position is taken, please pick again');
-					} else {
-						alert('Sorry! This game is full now, but you can watch this game until the next begins, or a player drops out');
-						InputManager.onPickPlayer(function(){});
-					}
-				})
-			} else { //play by yourself for funsies
-				InputManager.onPickPlayer(function(){});
-				Engine.assign(chosen);
-			}
-		};
-		InputManager.onPickPlayer(pickHandler);
-	
-		function loop(t){
-			var velo = InputManager.getInputs(),
-				now = new Date().getTime(),
-				dt=0,
-				past;
-				
-			if (past){
-				dt = Math.min(1,(now-past)/1000);
-			}
+			
+			
+		if (!Network.connected){
+			InputManager.onPickPlayer(pickHandler);
+		}
+		InputManager.onChange(function(velo){
+			Network.send('v',velo)
 			Engine.apply(velo);
-			while (dt >= (1000/60)){
-				dt -= 1000/60;
-				Engine.update();
+		})
+		
+		
+		
+		function pickHandler(x,y){
+			var chosen = Engine.playerSelect(x/scale,y/scale);
+			if (chosen !== false){
+				if (Network.connected){
+					Network.send('claim',chosen);
+					Network.on('ca',function(d){
+						if (d==1){
+							Engine.assign(chosen);
+							InputManager.onPickPlayer(function(){});
+						} else if (d==0){
+							alert('Woops! that position is taken, please pick again');
+						} else {
+							alert('Sorry! This game is full now, but you can watch this game until the next begins, or a player drops out');
+							InputManager.onPickPlayer(function(){});
+						}
+					})
+				} else { //play by yourself for funsies
+					InputManager.onPickPlayer(function(){});
+					Engine.assign(chosen);
+				}
 			}
-			Renderer.display(Engine.update(),t);
-			past=now;
+		}
+		var past, dt;
+		function loop(t){
+			if (past){
+				dt = t-past;
+			}
+			Renderer.display(Engine.update(dt));
+			past = t;
 			window.requestAnimationFrame(loop);
 		}
 		

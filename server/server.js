@@ -13,9 +13,45 @@ function send(s,msg,broad){
 	}
 }
 
-var players = [];
+var Game = (function(){
+	var players = [],
+	_full = 0;
+	
+	return {
+		full: function(){
+			return (_full == 14);
+		},
+		available: function(i){
+			return (!this.full() && (typeof players[i] == 'undefined' || players[i] === null) && i >= 0 && i < 15);
+		},
+		add: function(sock,i){
+			if (this.available(i)){
+				players[i] = sock;
+				Engine.newPlayer(i);
+				_full++;
+				return true;
+			} else {
+				console.log('RUUUN');
+				return false;
+			}
+		},
+		isPlayer: function(sock){
+			for (var i=0, l=players.length; i<l; i++){
+				if (players[i] && players[i].id == sock.id){
+					return i;
+				}
+			}
+			return false;
+		},
+		lostPlayer: function(i){
+			players[i] = null;
+			_full--;
+			Engine.lostPlayer(i);
+		}
+	}
+})();
 
-var Engine = function(){
+var Engine = (function(){
 	var state = {},
 		positions = ['seeker','beater','chaser','keeper','chaser','beater','chaser'],
 		speed=1,
@@ -34,21 +70,22 @@ var Engine = function(){
 	function reset(){
 		var players=[],
 			balls=[];
-	
+			
+					
 		//set up players in default positions
-		var x=78,
+		var x=dimensions.playerStart,
 			y,
 			t=0;
 		for (var i=0; i<14; i++){
 			if (i>6){
-				x=362;
+				x=dimensions.bounds[0]-dimensions.playerStart;
 				t=1;
 			}
 			y = 90+20*(i%7);
 			players[i] = new Player(positions[i%7],[x,y],[0,0],t,i);
 		}
 		//set up balls
-		x=220;
+		x=dimensions.bounds[0]/2;
 		for (var i=0; i<5; i++){
 			switch(i){
 				case 0:
@@ -75,9 +112,6 @@ var Engine = function(){
 		}
 		return {b:balls, p:players};
 	}
-	
-	state = reset();
-
 	
 	
 	function Player(p,l,v,t,i,o,h,c){
@@ -132,11 +166,11 @@ var Engine = function(){
 		this.r = dimensions.R[3];
 	}
 	
-	function compact(){
+	function compact(s){
 		var e = {b:[],p:[]},
 			k;
-		for (var i=0, l=state.b.length; i<l; i++){
-			k = state.b[i];
+		for (var i=0, l=s.b.length; i<l; i++){
+			k = s.b[i];
 			if (i<4){
 				e.b.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1],i,+k.hold,+k.dead,+k.thrower]);
 				for (var j=0, m=k.ignore.length; j<m; j++){
@@ -146,8 +180,8 @@ var Engine = function(){
 				e.b.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1]])
 			}
 		}
-		for (var i=0, l=state.p.length; i<l; i++){
-			k = state.p[i];
+		for (var i=0, l=s.p.length; i<l; i++){
+			k = s.p[i];
 			e.p.push([k.loc[0],k.loc[1],k.velo[0],k.velo[1],i,+k.out,+k.hold,+k.controlled]);
 		}
 		return e;
@@ -167,24 +201,20 @@ var Engine = function(){
 	
 	return {
 		init: function(){
-			var that=this;
-			return {
-					field: dimensions,
-					positions: positions,
-					state: that.getState()
-				};
+			state = reset();
 		},
-		apply: function(input){ //input is force changes on object
-			if (typeof self === 'number'){
-				state.p[self].velo[0] = bound(input[0]);
-				state.p[self].velo[1] = bound(input[1]);
+		apply: function(i,v){ //input is force changes on object
+			if (typeof i === 'number'){
+				state.p[i].velo[0] = bound(v[0]);
+				state.p[i].velo[1] = bound(v[1]);
 			}
 		},
-		update: function(){
+		update: function(dt){
+			var factor = dt/(1000/60) || 1;
 			for (var i=0, l=state.p.length; i<l; i++){
 				//move
-				state.p[i].loc[0] += speed*state.p[i].velo[0];
-				state.p[i].loc[1] += speed*state.p[i].velo[1];
+				state.p[i].loc[0] += speed*factor*state.p[i].velo[0];
+				state.p[i].loc[1] += speed*factor*state.p[i].velo[1];
 				
 				//round
 				state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
@@ -198,23 +228,82 @@ var Engine = function(){
 			return this.getState();
 		},
 		getState: function(){
-			var view = {b:[],p:[]};
-			for (var i=0, l=state.p.length; i<l; i++){
-				view.p[i] = [state.p[i].loc[0],state.p[i].loc[1],+state.p[i].controlled,+state.p[i].out];
-			}
-			for (var i=0, l=state.b.length; i<l; i++){
-				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1]];
-			}
-			return view;
+			return compact(state);
+		},
+		pick: function(i){
+			return !state.p[i].controlled;
+		},
+		newPlayer: function(i){
+			state.p[i].controlled = true;
+		},
+		lostPlayer: function(i){
+			state.p[i].controlled = false;
 		}
 	}
-}();
+})();
 
+
+Engine.init();
+
+var dispatch = {};
+dispatch.claim = function(i){
+	if (Engine.pick(i)&& Game.add(this,i)){
+		console.log('new player selected');
+		send(this,{t:'ca',d:1}); //a winner is you!
+	} else if (Game.full()){
+		console.log('full');
+		send(this,{t:'ca',d:-1}); //full up, son!
+	} else {
+		console.log('not him, but not full');
+		send(this,{t:'ca',d:0}); //try again, there's room
+	}
+}
+dispatch.v = function(velo){
+	var p;
+	if ((p=Game.isPlayer(this))!==false){
+		Engine.apply(p,velo)
+	}
+}
 
 io.sockets.on('connection',function(sock){
-	
+	/*
+	for (var key in sock){
+		if (typeof sock[key] == 'function'){
+			console.log(key+': fn')
+		} else {
+			console.log(key+': '+sock[key]);
+		}
+	}
+	*/
+	if (Game.full()){
+		send(sock,{t:'w',d:'f'});
+	} else {
+		send(sock,{t:'w',d:'o'});
+		sock.on('message',function(d){
+			//console.log('recv msg: '+d);
+			d = JSON.parse(d);
+			if (Object.prototype.hasOwnProperty.call(dispatch,d.t)){
+				dispatch[d.t].call(sock,d.d); //set this===sock
+			}
+		});
+	}
+	sock.on('disconnect',function(){
+		var i = Game.isPlayer(this);
+		if (i !== false){
+			Game.lostPlayer(i);
+		}
+	})
 });
 
-io.sockets.on('disconnect',function(sock){
+var past = new Date().getTime(),
+	now;
+setInterval(function(){
+	now = new Date().getTime();
+	var dt = now-past;
+	Engine.update(dt);
+	past = now;
+},1000/120);
 
-});
+setInterval(function(){
+	io.sockets.volatile.send(JSON.stringify({t:'s',d:Engine.getState()}));
+}, 1000/30)
