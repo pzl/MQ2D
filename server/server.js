@@ -212,6 +212,7 @@ var Engine = (function(){
 		update: function(dt){
 			var factor = dt/(1000/60) || 1;
 			for (var i=0, l=state.p.length; i<l; i++){
+				
 				//move
 				state.p[i].loc[0] += speed*factor*state.p[i].velo[0];
 				state.p[i].loc[1] += speed*factor*state.p[i].velo[1];
@@ -220,6 +221,20 @@ var Engine = (function(){
 				state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
 				state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
 				
+				
+				
+				for (var j=0, m=state.b.length-1; j<m; j++){
+					if (!~state.b[j].hold && state.p[i].hold==6 && collision(state.b[j],state.p[i])){
+						state.b[j].hold = i;
+						state.p[i].hold = j;
+					}
+					if (state.b[j].hold == i){
+						state.b[j].loc[0] = state.p[i].loc[0]+state.p[i].r;
+						state.b[j].loc[1] = state.p[i].loc[1];
+					} else {
+					
+					}
+				}
 				
 				if (state.p[i].out && state.p[i].atHoops()){
 					state.p[i].out=false;
