@@ -1,3 +1,7 @@
+client/game.js
+client/game.min.js
+client/plugs.js
+
 lib-cov
 *.seed
 *.log
