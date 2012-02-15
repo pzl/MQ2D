@@ -1,7 +1,7 @@
 var Controller = function(){
 	var scale = 1.5;
 
-	Renderer = Renderer(scale);
+	Renderer = Renderer(scale,WebGLForFunsies);
 	Renderer.init(Engine.init());
 	
 	Network = Network();
