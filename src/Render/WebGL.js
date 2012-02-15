@@ -46,6 +46,7 @@ var WebGLForFunsies = function(scale){
 			field = start.field;
 			var rad = field.R[0],
 				fieldMat = new THREE.MeshLambertMaterial({color: 0x6ac06e, ambient: 0xeeeeee}),
+				groundMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, ambient: 0x333333}),
 				biglineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 5}),
 				medlineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 2}),
 				smllineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 1}),
@@ -67,25 +68,25 @@ var WebGLForFunsies = function(scale){
 						   new THREE.SphereGeometry(field.R[2],16,16),
 						   new THREE.SphereGeometry(field.R[3],16,16)],
 				lights = [new THREE.DirectionalLight(0XFFFFFF,0.6),new THREE.DirectionalLight(0XFAB65A)],
-				plane = new THREE.Mesh(new THREE.PlaneGeometry(field.bounds[1],field.bounds[0],32,32),fieldMat);
+				plane = new THREE.Mesh(new THREE.PlaneGeometry(500,1200,32,32),groundMat);
 				
 				
 				
 			//field lines
 			midlineGeo.vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.bounds[0]/2)),
 									 new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.bounds[0]/2)));
-			kZoneGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.keepZone)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.keepZone)));
-			kZoneGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.bounds[0]-field.keepZone)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.bounds[0]-field.keepZone)));
-			goalLineGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.goalLine)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.goalLine)));
-			goalLineGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.bounds[0]-field.goalLine)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.bounds[0]-field.goalLine)));
-			startLineGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.playerStart)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.playerStart)));
-			startLineGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(0,0.5,field.bounds[0]-field.playerStart)),
-									  new THREE.Vertex(new THREE.Vector3(-field.bounds[1],0.5,field.bounds[0]-field.playerStart)));
+			kZoneGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.065*field.bounds[1],0.5,field.keepZone)),
+									  new THREE.Vertex(new THREE.Vector3(-0.935*field.bounds[1],0.5,field.keepZone)));
+			kZoneGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.065*field.bounds[1],0.5,field.bounds[0]-field.keepZone)),
+									  new THREE.Vertex(new THREE.Vector3(-0.935*field.bounds[1],0.5,field.bounds[0]-field.keepZone)));
+			goalLineGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.17*field.bounds[1],0.5,field.goalLine)),
+									     new THREE.Vertex(new THREE.Vector3(-0.83*field.bounds[1],0.5,field.goalLine)));
+			goalLineGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.17*field.bounds[1],0.5,field.bounds[0]-field.goalLine)),
+										 new THREE.Vertex(new THREE.Vector3(-0.83*field.bounds[1],0.5,field.bounds[0]-field.goalLine)));
+			startLineGeo[0].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.12*field.bounds[1],0.5,field.playerStart)),
+										  new THREE.Vertex(new THREE.Vector3(-0.88*field.bounds[1],0.5,field.playerStart)));
+			startLineGeo[1].vertices.push(new THREE.Vertex(new THREE.Vector3(-0.12*field.bounds[1],0.5,field.bounds[0]-field.playerStart)),
+									 	  new THREE.Vertex(new THREE.Vector3(-0.88*field.bounds[1],0.5,field.bounds[0]-field.playerStart)));
 			var midline = new THREE.Line(midlineGeo,biglineMat),
 				klines = [new THREE.Line(kZoneGeo[0],medlineMat),new THREE.Line(kZoneGeo[1],medlineMat)],
 				glines = [new THREE.Line(goalLineGeo[0],medlineMat),new THREE.Line(goalLineGeo[1],medlineMat)],
@@ -160,13 +161,12 @@ var WebGLForFunsies = function(scale){
 			}
 
 			
-			
 			//sideline view
 			camera.position.y =40;
 			camera.position.z = field.bounds[0]/2;
 			camera.position.x = -1*field.bounds[1]-150;
 			camera.rotation.y=-90*Math.PI/180;
-			
+
 			
 			/*
 			//positive Z player view
@@ -175,12 +175,33 @@ var WebGLForFunsies = function(scale){
 			camera.position.x = 0;
 			camera.rotation.y=0;
 			*/
+
 			
+			function ellipse(ctx, x, y, xDis, yDis) {
+			    var kappa = 0.5522848, // 4 * ((√(2) - 1) / 3)
+			        ox = xDis * kappa,  // control point offset horizontal
+			        oy = yDis * kappa,  // control point offset vertical
+			        xe = x + xDis,      // x-end
+			        ye = y + yDis;      // y-end
 			
+			    ctx.moveTo(x - xDis, y);
+			    ctx.bezierCurveTo(x - xDis, y - oy, x - ox, y - yDis, x, y - yDis);
+			    ctx.bezierCurveTo(x + ox, y - yDis, xe, y - oy, xe, y);
+			    ctx.bezierCurveTo(xe, y + oy, x + ox, ye, x, ye);
+			    ctx.bezierCurveTo(x - ox, ye, x - xDis, y + oy, x - xDis, y);
+			}
+			
+			var pitchPath = new THREE.Shape();
+			ellipse(pitchPath,0,0,field.bounds[1]/2,field.bounds[0]/2);
+			var pitchGeo = pitchPath.extrude({ amount: 0, bevelEnabled: false}),
+				pitch = THREE.SceneUtils.createMultiMaterialObject(pitchGeo, [ fieldMat, new THREE.MeshBasicMaterial( { color: 0x000000, transparent: true, opacity: 0 } ) ] );
+			
+			pitch.rotation.x = -90*Math.PI/180;
+			pitch.position.z += field.bounds[0]/2;
+			pitch.position.x -= field.bounds[1]/2;
 			
 			plane.rotation.x = -90*Math.PI/180;
-			plane.position.z += field.bounds[0]/2;
-			plane.position.x -= field.bounds[1]/2;
+			plane.position.set(-150,-1,300);
 			
 			
 			lights[0].position.x = -240;
@@ -200,6 +221,9 @@ var WebGLForFunsies = function(scale){
 			scene.add(plines[0]);
 			scene.add(plines[1]);
 			
+			
+			scene.add(pitch);
+
 			
 			//debugaxis(400);
 			
