@@ -1,30 +1,47 @@
 var Controller = function(){
-	var scale = 1.5;
-
-	Renderer = Renderer(scale,WebGLForFunsies);
-	Renderer.init(Engine.init());
+	var scale = 1.5,
+		ThreeD = ( function () { try { return !! window.WebGLRenderingContext && !! document.createElement( 'canvas' ).getContext( 'experimental-webgl' ); } catch( e ) { return false; } } )(),
+		Render,
+		Input,
+		Net;
+		
+	if (ThreeD){
+		scale=1;
+		Render = Renderer(scale,WebGLForFunsies);
+	} else {
+		Render = Renderer(scale);
+	}
+	Render.init(Engine.init());
 	
-	Network = Network();
-	Network.on('w',function(d){ //welcome
+	if (ThreeD){
+		Input = InputManager(ThreeDSpace);
+		Input.playerElements(Render.getPlayers());
+	} else {
+		Input = InputManager();
+	}
+	
+	Net = Network();
+	Net.on('w',function(d){ //welcome
 			if (d=='f'){
 				alert('This game is currently full! You can watch until the next game begins, though!')
 			} else {
-				InputManager.onPickPlayer(pickHandler);
+				Input.onPickPlayer(pickHandler);
 			}
 		})
 		.on('s',function(d){ //state
 			Engine.setState(d);
+			Engine.apply(Input.getInputs());
 		})
 		.on('b',function(d){ //ball action (not movement)
 		
 		});
 		
 		
-	if (!Network.connected){
-		InputManager.onPickPlayer(pickHandler);
+	if (!Net.connected){
+		Input.onPickPlayer(pickHandler);
 	}
-	InputManager.onChange(function(velo){
-		Network.send('v',velo)
+	Input.onChange(function(velo){
+		Net.send('v',velo)
 		Engine.apply(velo);
 	})
 	
@@ -32,22 +49,23 @@ var Controller = function(){
 	
 	function pickHandler(x,y){
 		var chosen = Engine.playerSelect(x/scale,y/scale);
+		console.log(chosen);
 		if (chosen !== false){
-			if (Network.connected){
-				Network.send('claim',chosen);
-				Network.on('ca',function(d){
+			if (Net.connected){
+				Net.send('claim',chosen);
+				Net.on('ca',function(d){
 					if (d==1){
 						Engine.assign(chosen);
-						InputManager.onPickPlayer(function(){});
+						Input.onPickPlayer(function(){});
 					} else if (d==0){
 						alert('Woops! that position is taken, please pick again');
 					} else {
 						alert('Sorry! This game is full now, but you can watch this game until the next begins, or a player drops out');
-						InputManager.onPickPlayer(function(){});
+						Input.onPickPlayer(function(){});
 					}
 				})
 			} else { //play by yourself for funsies
-				InputManager.onPickPlayer(function(){});
+				Input.onPickPlayer(function(){});
 				Engine.assign(chosen);
 			}
 		}
@@ -57,7 +75,7 @@ var Controller = function(){
 		if (past){
 			dt = t-past;
 		}
-		Renderer.display(Engine.update(dt));
+		Render.display(Engine.update(dt));
 		past = t;
 		stats.update();
 		window.requestAnimationFrame(loop);
@@ -65,7 +83,7 @@ var Controller = function(){
 	
 	return {
 		start: function(){
-			Renderer.display(Engine.getState());
+			Render.display(Engine.getState());
 			loop(new Date().getTime());
 		}
 	}

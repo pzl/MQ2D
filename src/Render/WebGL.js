@@ -7,6 +7,7 @@ var WebGLForFunsies = function(scale){
 		near = 0.1,
 		far = 10000,
 		field,
+		ballMap = [0,1,1,1,2];
 		container = document.getElementById('game'),
 		renderer = new THREE.WebGLRenderer({antialias:true}),
 		camera = new THREE.PerspectiveCamera(angle,aspect,near,far),
@@ -18,6 +19,7 @@ var WebGLForFunsies = function(scale){
 	renderer.setSize(width,height);
 	renderer.domElement.id='THREE';
 	container.appendChild(renderer.domElement);
+	scene.add(camera);
 	
 	var debugaxis = function(axisLength){
 	    //Shorten the vertex function
@@ -64,9 +66,9 @@ var WebGLForFunsies = function(scale){
 				ballMat = [new THREE.MeshLambertMaterial({ color: 0xffffff, ambient: 0xcccccc }),
 						   new THREE.MeshLambertMaterial({ color: 0xee7777, ambient: 0xcccccc }),
 						   new THREE.MeshLambertMaterial({ color: 0xffd700, ambient: 0xffffff })],
-				ballGeo = [new THREE.SphereGeometry(field.R[1],16,16),
-						   new THREE.SphereGeometry(field.R[2],16,16),
-						   new THREE.SphereGeometry(field.R[3],16,16)],
+				ballGeo = [new THREE.SphereGeometry(field.R[1],8,8),
+						   new THREE.SphereGeometry(field.R[2],8,8),
+						   new THREE.SphereGeometry(field.R[3],8,8)],
 				lights = [new THREE.DirectionalLight(0XFFFFFF,0.6),new THREE.DirectionalLight(0XFAB65A)],
 				plane = new THREE.Mesh(new THREE.PlaneGeometry(500,1200,32,32),groundMat);
 				
@@ -132,16 +134,10 @@ var WebGLForFunsies = function(scale){
 			}
 			
 			//balls
-			var ball=0;
 			for (var i=0, l=start.state.b.length; i<l; i++){
-				if (i==4){
-					ball=2;
-				} else if (i>0){
-					ball=1;
-				}
-				balls[i] = THREE.SceneUtils.createMultiMaterialObject(ballGeo[ball],[ballMat[ball],wf]);
+				balls[i] = THREE.SceneUtils.createMultiMaterialObject(ballGeo[ballMap[i]],[ballMat[ballMap[i]],wf]);
 				
-				balls[i].position.y = field.R[ball+1];
+				balls[i].position.y = field.R[ballMap[i]+1];
 				balls[i].position.x = -start.state.b[i][1];
 				balls[i].position.z = start.state.b[i][0];
 				scene.add(balls[i]);
@@ -203,13 +199,8 @@ var WebGLForFunsies = function(scale){
 			plane.rotation.x = -90*Math.PI/180;
 			plane.position.set(-150,-1,300);
 			
-			
-			lights[0].position.x = -240;
-			lights[0].position.y = 52;
-			lights[0].position.z = 180;
-			lights[1].position.x = 80;
-			lights[1].position.y = 400;
-			lights[1].position.z = 220;
+			lights[0].position.set(-296, 104, -135);
+			lights[1].position.set(80,400,220);
 			scene.add(lights[0]);
 			scene.add(lights[1]);
 			scene.add(plane);
@@ -230,7 +221,6 @@ var WebGLForFunsies = function(scale){
 			
 			
 			renderer.render(scene,camera);
-
 		},
 		display: function(state){
 			for (var i=0, l=state.p.length; i<l; i++){
@@ -238,8 +228,12 @@ var WebGLForFunsies = function(scale){
 				players[i].position.z = state.p[i][0];
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
-				balls[i].position.x = -1*state.b[i][1];
-				balls[i].position.z = state.b[i][0];
+				balls[i].position.set(-1*state.b[i][1],field.R[ballMap[i]+1],state.b[i][0])
+				if (state.b[i][2] < 6){
+					balls[i].position.y += 2;
+				} else if (state.b[i][3]){
+					balls[i].position.y+=6;
+				}
 			}
 			renderer.render(scene,camera);
 
@@ -247,6 +241,9 @@ var WebGLForFunsies = function(scale){
 		destroy: function(){
 			var game = document.getElementById('game');
 			game.removeChild(game.getElementsById('THREE'));
+		},
+		getPlayers: function(){
+			return players;
 		}
 	}
 	return API;

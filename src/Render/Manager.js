@@ -23,6 +23,7 @@ var Renderer = function(scale,override){
 		display: function(state){ return manager.display(state); },
 		destroy: function(){ return manager.destroy(); },
 		//Optional
-		out: function(i){ if (typeof manager.out == 'function'){ manager.out(i); } }
+		out: function(i){ if (typeof manager.out == 'function'){ return manager.out(i); } },
+		getPlayers: function(){ if (typeof manager.getPlayers == 'function') { return manager.getPlayers(); } }
 	}
 };

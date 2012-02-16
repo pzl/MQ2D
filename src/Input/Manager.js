@@ -12,6 +12,8 @@ var InputManager = function(override){
 		getInputs: function(){ return manager.getInputs(); },//returns [velX,velY] as float between -1 and 1. positive X = right, positive Y = down
 		onChange: function(cb){ return manager.onChange(cb); },
 		onShoot: function(cb){ return manager.onShoot(cb); },
-		onPickPlayer: function(cb,scale) { return manager.onPickPlayer(cb,scale); }
+		onPickPlayer: function(cb,scale) { return manager.onPickPlayer(cb,scale); },
+		//Optional
+		playerElements: function(el){ if (typeof manager.playerElements == 'function'){ return manager.playerElements(el); } }
 	}
-}();
+};

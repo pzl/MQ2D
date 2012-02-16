@@ -1,4 +1,4 @@
-var Keyboard = function(){
+var ThreeDSpace = function(){
 	var key = { 
 				arrow:{left: 37, up: 38, right: 39, down: 40 }, 
 				wasd: { left: 65, up: 87, right: 68, down: 83}, 
@@ -8,8 +8,8 @@ var Keyboard = function(){
 		left=0,
 		up=0,
 		down=0,
-		players,
 		API = {},
+		players = [],
 		shootCB,
 		changeCB;
 	d3.select(document).on('keydown', function(){
@@ -89,13 +89,25 @@ var Keyboard = function(){
 			players = el;
 		},
 		onPickPlayer: function(cb){
-			//var entity = players || document;
-			d3.select(document).on('mousedown',function(){
-				if (typeof cb == 'function'){
-					cb(d3.event.x,d3.event.y);
+			var projector = new THREE.Projector(),
+				cam;
+			for (var i=0, l=window.scene.children.length; i<l; i++){
+				if (window.scene.children[i].hasOwnProperty('near')){
+					cam = window.scene.children[i];
+					break;
 				}
-				d3.event.preventDefault();
-			})	
+			}
+			
+			d3.select(document).on('mousedown',function(){
+				var vector = new THREE.Vector3(( d3.event.clientX / window.innerWidth ) * 2 - 1, - ( d3.event.clientY / window.innerHeight ) * 2 + 1, 0.5 );
+				projector.unprojectVector(vector,cam);
+				var ray = new THREE.Ray(cam.position, vector.subSelf(cam.position).normalize()),
+					intersects = ray.intersectObjects(players);
+					if (intersects && intersects.length > 0 && typeof cb == 'function'){
+						cb(intersects[0].object.position.z,-1*intersects[0].object.position.x);
+					}
+				
+			});
 		},
 		shoot: function(cb){
 			shootCB = cb;
