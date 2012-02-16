@@ -171,8 +171,11 @@ var Engine = (function(){
 		},
 		apply: function(input){ //input is force changes on object
 			if (typeof self === 'number'){
-				state.p[self].velo[0] = bound(input[0]);
-				state.p[self].velo[1] = bound(input[1]);
+				state.p[self].velo = [bound(input[0]),bound(input[1])];
+				
+				if (state.p[self].hold < 6){
+					state.b[state.p[self].hold].velo = [state.p[self].velo[0],state.p[self].velo[1]];
+				}
 			}
 		},
 		update: function(dt){
@@ -187,10 +190,20 @@ var Engine = (function(){
 					state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
 					state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
 					
+					if (state.p[i].hold < 6){
+						state.b[state.p[i].hold].velo = [state.p[i].velo[0],state.p[i].velo[1]];
+					}
 					
 					if (state.p[i].out && state.p[i].atHoops()){
 						state.p[i].out=false;
 					}
+				}					
+			}
+			for (var i=0, l=state.b.length; i<l; i++){
+				if (state.b[i].velo[0] || state.b[i].velo[1]){
+					//move
+					state.b[i].loc[0] += speed*factor*state.b[i].velo[0];
+					state.b[i].loc[1] += speed*factor*state.b[i].velo[1];
 				}					
 			}
 			return this.getState();
@@ -205,7 +218,7 @@ var Engine = (function(){
 				view.p[i] = [state.p[i].loc[0],state.p[i].loc[1],+state.p[i].controlled,+state.p[i].out];
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
-				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1]];
+				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1],+state.b[i].hold,+state.b[i].dead];
 			}
 			return view;
 		},
