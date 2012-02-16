@@ -164,6 +164,9 @@ var Engine = (function(){
 		this.loc=l;
 		this.velo=v;
 		this.r = dimensions.R[3];
+		this.thrower=-1;
+		this.hold=-1;
+		this.ignore=[];
 	}
 	
 	function compact(s){
@@ -197,6 +200,29 @@ var Engine = (function(){
 	function collision(a,b){
 		return !!(Math.sqrt(( b.loc[0]-a.loc[0] ) * ( b.loc[0]-a.loc[0] )  + ( b.loc[1]-a.loc[1] ) * ( b.loc[1]-a.loc[1] ) ) <= ( a.r + b.r ));
 	}
+	function pickup(p,b){
+		state.p[p].hold=b;
+		state.b[b].hold=p;
+		
+		state.b[b].ignore=[];
+		state.b[b].dead=true;
+		state.b[b].thrower=-1;
+	}
+	
+	function out(p){
+		var b = state.p[p];
+		state.p[p].out=true;
+		
+		if (b < 6){
+			state.b[b].hold = -1;
+			state.b[b].ignore = [];
+			state.b[b].thrower = -1;
+			state.b[b].dead=true;
+			
+			state.p[p].hold = 6;
+			
+		}
+	}
 	
 	
 	return {
@@ -212,32 +238,67 @@ var Engine = (function(){
 		update: function(dt){
 			var factor = dt/(1000/60) || 1;
 			for (var i=0, l=state.p.length; i<l; i++){
+				var player = state.p[i];
 				
 				//move
-				state.p[i].loc[0] += speed*factor*state.p[i].velo[0];
-				state.p[i].loc[1] += speed*factor*state.p[i].velo[1];
+				player.loc[0] += speed*factor*player.velo[0];
+				player.loc[1] += speed*factor*player.velo[1];
 				
 				//round
-				state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
-				state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
+				player.loc[0]= (~~(player.loc[0]*10))/10;
+				player.loc[1]= (~~(player.loc[1]*10))/10;
 				
 				
-				
-				for (var j=0, m=state.b.length-1; j<m; j++){
-					if (!~state.b[j].hold && state.p[i].hold==6 && collision(state.b[j],state.p[i])){
-						state.b[j].hold = i;
-						state.p[i].hold = j;
-					}
-					if (state.b[j].hold == i){
-						state.b[j].loc[0] = state.p[i].loc[0]+state.p[i].r;
-						state.b[j].loc[1] = state.p[i].loc[1];
-					} else {
-					
+				if (!player.out){ //ignore balls if you're out
+					for (var j=0, m=state.b.length-1; j<m; j++){
+						var ball = state.b[j];
+						if (!~ball.hold 							//free ball
+						&& collision(ball,player)					//touching it
+						&& ball.thrower != i						//didn't throw it
+						&& !~ball.ignore.indexOf(i)){				//not being ignored
+							if (j==4 									//snitch
+							&& i%7==0){	 								//you're a seeker
+								//CATCH SNITCH
+							} else if (j==0 							//quaffle
+							&& (i%7 > 1&& i%7 != 5)){ 					//chaser or keeper
+								//chance based on position, and location for keeper
+								//and based on dead or not
+							} else if (j>0 && j<4) {					//bludger
+								if (ball.dead 							//dead ball
+								&& (i%7 == 1 || i%7 == 5 )){ 			//you're a beater
+									pickup(i,j);
+								} else if (!ball.dead){					//live ball!
+									if ((i%7 == 1 || i%7 == 5 )){		//beater
+										//											!! add high catch prob. for teammates, no out
+										var chance = Math.random();
+										if (chance < 0.2){			//catch!
+											pickup(i,j);
+										} else if (chance < 0.5){	//hit!
+											//										!! ricochet or other ball info
+											out(i);
+										} else {					//miss/deflect!
+											
+										}
+									} else {//										!! add keeper in zone
+										if(Math.random() < 0.7){	//hit you!
+											//										!! ricochet or clear ignore for ball, or stop
+											out(i);
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 				
-				if (state.p[i].out && state.p[i].atHoops()){
-					state.p[i].out=false;
+				
+				if (player.hold < 6 && state.b[player.hold] == i){ //looks like you're holding a ball
+					state.b[player.hold].loc =  [player.loc[0]+player.r,  player.loc[1]];
+					state.b[player.hold].velo = [player.velo[0], player.velo[1]];
+				}
+				
+				if (player.out && player.atHoops()){
+					player.out=false;
 				}					
 			}
 			return this.getState();
@@ -253,6 +314,8 @@ var Engine = (function(){
 		},
 		lostPlayer: function(i){
 			state.p[i].controlled = false;
+			state.p[i].velo =[0,0];
+			out(i);
 		}
 	}
 })();
