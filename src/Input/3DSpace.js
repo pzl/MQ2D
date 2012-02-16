@@ -86,7 +86,9 @@ var ThreeDSpace = function(){
 			changeCB = cb;
 		},
 		playerElements: function(el){
-			players = el;
+			for (var i=0, l=el.length; i<l; i++){
+				players[i] = el[i].children[0];
+			}
 		},
 		onPickPlayer: function(cb){
 			var projector = new THREE.Projector(),
@@ -104,7 +106,7 @@ var ThreeDSpace = function(){
 				var ray = new THREE.Ray(cam.position, vector.subSelf(cam.position).normalize()),
 					intersects = ray.intersectObjects(players);
 					if (intersects && intersects.length > 0 && typeof cb == 'function'){
-						cb(intersects[0].object.position.z,-1*intersects[0].object.position.x);
+						cb(intersects[0].point.z,-1*intersects[0].point.x);
 					}
 				
 			});

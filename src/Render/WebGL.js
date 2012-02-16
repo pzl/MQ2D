@@ -7,7 +7,7 @@ var WebGLForFunsies = function(scale){
 		near = 0.1,
 		far = 10000,
 		field,
-		ballMap = [0,1,1,1,2];
+		ballMap = [0,1,1,1,2],
 		container = document.getElementById('game'),
 		renderer = new THREE.WebGLRenderer({antialias:true}),
 		camera = new THREE.PerspectiveCamera(angle,aspect,near,far),
@@ -47,6 +47,7 @@ var WebGLForFunsies = function(scale){
 		init: function(start){
 			field = start.field;
 			var rad = field.R[0],
+				posMap = {seeker:0xffd700,chaser:0xffffff,beater:0x000000,keeper:0x00ff00}
 				fieldMat = new THREE.MeshLambertMaterial({color: 0x6ac06e, ambient: 0xeeeeee}),
 				groundMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, ambient: 0x333333}),
 				biglineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 5}),
@@ -59,9 +60,7 @@ var WebGLForFunsies = function(scale){
 				goalLineGeo = [new THREE.Geometry(), new THREE.Geometry()],
 				startLineGeo = [new THREE.Geometry(), new THREE.Geometry()],
 				midlineGeo = new THREE.Geometry(),
-				playerMat = [new THREE.MeshLambertMaterial({color: 0xff0000, ambient: 0xffffff}),
-							 new THREE.MeshLambertMaterial({color: 0x1111ff, ambient: 0xffffff})],
-				playerGeo = new THREE.SphereGeometry(rad,32,32),
+				playerGeo = new THREE.SphereGeometry(rad,16,16),
 				wf = new THREE.MeshBasicMaterial( { color: 0x222222, wireframe: true, transparent: true, opacity: 0.1 } ),
 				ballMat = [new THREE.MeshLambertMaterial({ color: 0xffffff, ambient: 0xcccccc }),
 						   new THREE.MeshLambertMaterial({ color: 0xee7777, ambient: 0xcccccc }),
@@ -135,7 +134,7 @@ var WebGLForFunsies = function(scale){
 			
 			//balls
 			for (var i=0, l=start.state.b.length; i<l; i++){
-				balls[i] = THREE.SceneUtils.createMultiMaterialObject(ballGeo[ballMap[i]],[ballMat[ballMap[i]],wf]);
+				balls[i] = new THREE.SceneUtils.createMultiMaterialObject(ballGeo[ballMap[i]],[ballMat[ballMap[i]],wf]);
 				
 				balls[i].position.y = field.R[ballMap[i]+1];
 				balls[i].position.x = -start.state.b[i][1];
@@ -144,15 +143,16 @@ var WebGLForFunsies = function(scale){
 			}
 
 			//players
-			var t=0;
+			var t=0xff0000;
 			for (var i=0, l=start.state.p.length; i<l; i++){
 				if (i>6){
-					t=1;
+					t=0x0000ff;
 				}
-				players[i] = new THREE.Mesh(playerGeo,playerMat[t]);
-				players[i].position.y=rad;
-				players[i].position.x = -1*start.state.p[i][1];
-				players[i].position.z = start.state.p[i][0];
+				players[i] = new THREE.SceneUtils.createMultiMaterialObject(playerGeo, 
+												[new THREE.MeshLambertMaterial({color: t, ambient: 0xffffff, transparent: true, opacity: 1}),
+												 new THREE.MeshBasicMaterial({color: posMap[start.positions[i%7]], wireframe: true, transparent:true, opacity: 0.25})]);
+				players[i].position.set(-1*start.state.p[i][1], rad, start.state.p[i][0]);
+				players[i].defColor = t;
 				scene.add(players[i]);
 			}
 
@@ -226,6 +226,19 @@ var WebGLForFunsies = function(scale){
 			for (var i=0, l=state.p.length; i<l; i++){
 				players[i].position.x = -1*state.p[i][1];
 				players[i].position.z = state.p[i][0];
+
+								
+				if (state.p[i][3]){ //out
+					players[i].children[0].material.opacity=0.6;
+				} else if (!state.p[i][2]){ //not controlled
+					//players[i].children[0].material.opacity=0.4;
+					//players[i].children[0].material.wireframe = true;
+					players[i].children[0].material.color.setHex(0xdddddd);
+				} else {
+					players[i].children[0].material.opacity=1;
+					//players[i].children[0].material.wireframe = false;
+					players[i].children[0].material.color.setHex(players[i].defColor);
+				}
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
 				balls[i].position.set(-1*state.b[i][1],field.R[ballMap[i]+1],state.b[i][0])

@@ -49,7 +49,6 @@ var Controller = function(){
 	
 	function pickHandler(x,y){
 		var chosen = Engine.playerSelect(x/scale,y/scale);
-		console.log(chosen);
 		if (chosen !== false){
 			if (Net.connected){
 				Net.send('claim',chosen);
