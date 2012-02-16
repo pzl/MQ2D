@@ -98,7 +98,7 @@ var Engine = (function(){
 		this.velo = v;
 		this.idx=i;
 		this.hold= (typeof h =='undefined')? -1 : +h;
-		this.dead= !!d;
+		this.dead= (typeof d =='undefined')? true : !!d;
 		this.thrower=(typeof t =='undefined')? -1: +t;
 		this.ignore= g || [];
 		if (i==1){
@@ -128,12 +128,12 @@ var Engine = (function(){
 			k = b[i];
 			g=[];
 			if (i<4){
-				if (k.length > 7){
-					for (var j=7, m=k.length; j<m; j++){
+				if (k.length > 8){
+					for (var j=8, m=k.length; j<m; j++){
 						g.push(k[j]);
 					}
 				}
-				e.b[i] = new Ball([k[0],k[1]],[k[2],k[3]],i,k[4],k[5],k[6],g)
+				e.b[i] = new Ball([k[0],k[1]],[k[2],k[3]],i,k[5],k[6],k[7],g)
 			} else {
 				e.b[i] = new Snitch([k[0],k[1]],[k[2],k[3]]);
 			}
@@ -206,6 +206,7 @@ var Engine = (function(){
 					state.b[i].loc[1] += speed*factor*state.b[i].velo[1];
 				}					
 			}
+			window.state = state;
 			return this.getState();
 		},
 		setState: function(newState){
@@ -218,7 +219,7 @@ var Engine = (function(){
 				view.p[i] = [state.p[i].loc[0],state.p[i].loc[1],+state.p[i].controlled,+state.p[i].out];
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
-				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1],+state.b[i].hold,+state.b[i].dead];
+				view.b[i] = [state.b[i].loc[0],state.b[i].loc[1],state.b[i].hold,+state.b[i].dead];
 			}
 			return view;
 		},

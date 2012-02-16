@@ -61,6 +61,7 @@ var WebGLForFunsies = function(scale){
 				startLineGeo = [new THREE.Geometry(), new THREE.Geometry()],
 				midlineGeo = new THREE.Geometry(),
 				playerGeo = new THREE.SphereGeometry(rad,16,16),
+				headbandGeo = new THREE.CylinderGeometry(field.R[0]*0.8,field.R[0]*0.9,1,16,8,true),
 				wf = new THREE.MeshBasicMaterial( { color: 0x222222, wireframe: true, transparent: true, opacity: 0.1 } ),
 				ballMat = [new THREE.MeshLambertMaterial({ color: 0xffffff, ambient: 0xcccccc }),
 						   new THREE.MeshLambertMaterial({ color: 0xee7777, ambient: 0xcccccc }),
@@ -107,8 +108,8 @@ var WebGLForFunsies = function(scale){
 					h1 = h2 = field.goalHeights[1];
 				}
 			
-				bases[i] = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,h1,4,true),hoopMat);
-				bases[i+3] = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,h2,4,true),hoopMat);
+				bases[i] = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,h1,4,4,true),hoopMat);
+				bases[i+3] = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,h2,4,4,true),hoopMat);
 				hoops[i] = new THREE.Mesh(new THREE.TorusGeometry(field.goalDiam/2,0.4,8,32,Math.PI*2),hoopMat);
 				hoops[i+3] = new THREE.Mesh(new THREE.TorusGeometry(field.goalDiam/2,0.4,8,16,Math.PI*2),hoopMat);
 			
@@ -148,9 +149,16 @@ var WebGLForFunsies = function(scale){
 				if (i>6){
 					t=0x0000ff;
 				}
-				players[i] = new THREE.SceneUtils.createMultiMaterialObject(playerGeo, 
+				players[i] = new THREE.Object3D();
+				
+				players[i].add(new THREE.Mesh(playerGeo, new THREE.MeshLambertMaterial({color: t, ambient: 0xffffff, transparent: true, opacity: 1})));
+				players[i].add(new THREE.Mesh(headbandGeo, new THREE.MeshBasicMaterial({ color: posMap[start.positions[i%7]]})));
+				players[i].children[1].position.set(0,field.R[0]*0.55,0);
+				players[i].children[1].doubleSided=true;
+				
+				/*players[i] = new THREE.SceneUtils.createMultiMaterialObject(playerGeo, 
 												[new THREE.MeshLambertMaterial({color: t, ambient: 0xffffff, transparent: true, opacity: 1}),
-												 new THREE.MeshBasicMaterial({color: posMap[start.positions[i%7]], wireframe: true, transparent:true, opacity: 0.25})]);
+												 new THREE.MeshBasicMaterial({color: posMap[start.positions[i%7]], wireframe: true, transparent:true, opacity: 0.25})]);*/
 				players[i].position.set(-1*start.state.p[i][1], rad, start.state.p[i][0]);
 				players[i].defColor = t;
 				scene.add(players[i]);
@@ -217,8 +225,7 @@ var WebGLForFunsies = function(scale){
 
 			
 			//debugaxis(400);
-			
-			
+
 			
 			renderer.render(scene,camera);
 		},
@@ -231,21 +238,23 @@ var WebGLForFunsies = function(scale){
 				if (state.p[i][3]){ //out
 					players[i].children[0].material.opacity=0.6;
 				} else if (!state.p[i][2]){ //not controlled
-					//players[i].children[0].material.opacity=0.4;
-					//players[i].children[0].material.wireframe = true;
-					players[i].children[0].material.color.setHex(0xdddddd);
+					//players[i].children[0].material.color.setHex(0xdddddd);
+					players[i].children[0].material.wireframe=true;
 				} else {
 					players[i].children[0].material.opacity=1;
-					//players[i].children[0].material.wireframe = false;
-					players[i].children[0].material.color.setHex(players[i].defColor);
+					players[i].children[0].material.wireframe=false;
+					//players[i].children[0].material.color.setHex(players[i].defColor);
 				}
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
+				if (i==0){
+					//console.log(state.b[i]);
+				}
 				balls[i].position.set(-1*state.b[i][1],field.R[ballMap[i]+1],state.b[i][0])
-				if (state.b[i][2] < 6){
-					balls[i].position.y += 2;
-				} else if (state.b[i][3]){
-					balls[i].position.y+=6;
+				if (!!~state.b[i][2] && i != 4){
+					balls[i].position.y += 1.4;
+				} else if (!state.b[i][3] && i!= 4){
+					balls[i].position.y+=8;
 				}
 			}
 			renderer.render(scene,camera);

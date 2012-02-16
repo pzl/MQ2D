@@ -151,7 +151,7 @@ var Engine = (function(){
 		this.velo = v;
 		this.idx=i;
 		this.hold= (typeof h =='undefined')? -1 : +h;
-		this.dead= !!d;
+		this.dead= (typeof d =='undefined')? true : !!d;
 		this.thrower=(typeof t =='undefined')? -1: +t;
 		this.ignore= g || [];
 		if (i==1){
@@ -201,6 +201,7 @@ var Engine = (function(){
 		return !!(Math.sqrt(( b.loc[0]-a.loc[0] ) * ( b.loc[0]-a.loc[0] )  + ( b.loc[1]-a.loc[1] ) * ( b.loc[1]-a.loc[1] ) ) <= ( a.r + b.r ));
 	}
 	function pickup(p,b){
+		console.log(p+' picks up '+b);
 		state.p[p].hold=b;
 		state.b[b].hold=p;
 		
@@ -210,7 +211,7 @@ var Engine = (function(){
 	}
 	
 	function out(p){
-		var b = state.p[p];
+		var b = state.p[p].hold;
 		state.p[p].out=true;
 		
 		if (b < 6){
@@ -224,6 +225,8 @@ var Engine = (function(){
 		}
 	}
 	
+	
+	//			!! clear ignore and thrower on dead
 	
 	return {
 		init: function(){
@@ -249,9 +252,12 @@ var Engine = (function(){
 				player.loc[1]= (~~(player.loc[1]*10))/10;
 				
 				
-				if (!player.out){ //ignore balls if you're out
+				if (!player.out && player.controlled){ //ignore balls if you're out or a ghost
 					for (var j=0, m=state.b.length-1; j<m; j++){
-						var ball = state.b[j];
+						var ball = state.b[j],
+							chance = Math.random();
+							
+							
 						if (!~ball.hold 							//free ball
 						&& collision(ball,player)					//touching it
 						&& ball.thrower != i						//didn't throw it
@@ -259,30 +265,110 @@ var Engine = (function(){
 							if (j==4 									//snitch
 							&& i%7==0){	 								//you're a seeker
 								//CATCH SNITCH
+								
+								
+								
+								
 							} else if (j==0 							//quaffle
-							&& (i%7 > 1&& i%7 != 5)){ 					//chaser or keeper
-								//chance based on position, and location for keeper
-								//and based on dead or not
+							&& (i%7 > 1 && i%7 != 5)){ 					//chaser or keeper
+								if (ball.dead){							//dead ball
+									pickup(i,j);
+								} else {								//live ball
+									if (i%7==3){						//keeper
+										if (player.inZone()){			//in Zone
+											if (chance > 0.87){
+												//whiff!
+												ball.ignore.push(i);
+											} else {
+												pickup(i,j);
+											}
+										} else {						//out of zone
+											if (!!~ball.thrower 
+											&& ~~(ball.thrower/7)==player.team){ //pass
+												if (chance < 0.8){
+													pickup(i,j);
+												} else {
+													ball.ignore.push(i);//dropped
+												}
+											} else {							//intercept
+												if (chance < 0.2){ //pick!
+													pickup(i,j);
+												} else {
+													ball.ignore.push(i);//miss
+												}
+											}
+										}
+									} else {
+										if (!!~ball.thrower 
+											&& ~~(ball.thrower/7)==player.team){ //pass
+												if (chance < 0.87){
+													pickup(i,j);
+												} else {
+													ball.ignore.push(i);//dropped
+												}
+											} else {							//intercept
+												if (chance < 0.33){ //pick!
+													pickup(i,j);
+												} else {
+													ball.ignore.push(i);//miss
+												}
+											}
+									}
+								}
+								
+								
+								
+								
 							} else if (j>0 && j<4) {					//bludger
 								if (ball.dead 							//dead ball
-								&& (i%7 == 1 || i%7 == 5 )){ 			//you're a beater
+								&& (i%7 == 1 || i%7 == 5 )				//you're a beater
+								&& player.hold ==6){					//not already holding a ball
 									pickup(i,j);
 								} else if (!ball.dead){					//live ball!
-									if ((i%7 == 1 || i%7 == 5 )){		//beater
-										//											!! add high catch prob. for teammates, no out
-										var chance = Math.random();
-										if (chance < 0.2){			//catch!
-											pickup(i,j);
-										} else if (chance < 0.5){	//hit!
-											//										!! ricochet or other ball info
-											out(i);
-										} else {					//miss/deflect!
-											
+									if ((i%7 == 1 || i%7 == 5 )){		//is beater
+										
+										if (!!~ball.thrower 			//was thrown
+										&& ~~(ball.thrower/7)==player.team){//by a teammate
+											if (chance < 0.75){		//catch!
+												pickup(i,j);
+											} else {				//miss!
+												ball.ignore.push(i);
+											}
+										} else {						//thrown by opponent
+											if (player.hold < 6){		//you're holding a bludger
+												if (chance > 0.85){
+													out(i);
+												} else {			//deflect!
+													ball.ignore.push(i);
+													//									!! ricochet
+												}
+											} else {					//not holding ball
+												if (chance < 0.2){	//catch!
+													pickup(i,j);
+												}else if(chance < 0.5){//hit!
+													//									!! ricochet or other ball info
+													out(i);
+												} else {			//miss
+													ball.ignore.push(i);
+												}
+											}
 										}
-									} else {//										!! add keeper in zone
-										if(Math.random() < 0.7){	//hit you!
-											//										!! ricochet or clear ignore for ball, or stop
-											out(i);
+									} else if (!ball.dead) {			//other position, live ball
+										if (i%7==3){					//keeper
+											if (player.inZone()){		//in zone
+												ball.ignore.push(i);//derp
+											} else if (chance < 0.75) {
+												out(i);
+											} else {  //straight up miss
+												ball.ignore.push(i); 
+											}
+										} else {
+											if(chance < 0.75){	//hit you!
+												//										!! ricochet or clear ignore for ball, or stop
+												out(i);
+											} else {
+												ball.ignore.push(i);
+											}
 										}
 									}
 								}
@@ -292,8 +378,10 @@ var Engine = (function(){
 				}
 				
 				
-				if (player.hold < 6 && state.b[player.hold] == i){ //looks like you're holding a ball
-					state.b[player.hold].loc =  [player.loc[0]+player.r,  player.loc[1]];
+				if (player.hold < 6 && state.b[player.hold].hold == i){ //looks like you're holding a ball
+					var x = (player.team==0)? player.r : -1*player.r;
+					var y = (player.team==0)? state.b[player.hold].r*2 : -1*state.b[player.hold].r*2;
+					state.b[player.hold].loc =  [player.loc[0]+x,  player.loc[1]+y];
 					state.b[player.hold].velo = [player.velo[0], player.velo[1]];
 				}
 				
