@@ -1,50 +1,86 @@
 var Controller = function(){
-	var scale = 1.5,
-		ThreeD = ( function () { try { return !! window.WebGLRenderingContext && !! document.createElement( 'canvas' ).getContext( 'experimental-webgl' ); } catch( e ) { return false; } } )(),
+
+	var scale,
 		Render,
 		Input,
-		Net;
-		
-	if (ThreeD){
-		scale=1;
-		Render = Renderer(scale,WebGLForFunsies);
-	} else {
-		Render = Renderer(scale);
-	}
-	Render.init(Engine.init());
+		Net,
+		stats;
 	
-	if (ThreeD){
-		Input = InputManager(ThreeDSpace);
-		Input.playerElements(Render.getPlayers());
-	} else {
-		Input = InputManager();
-	}
 	
-	Net = Network();
-	Net.on('w',function(d){ //welcome
-			if (d=='f'){
-				alert('This game is currently full! You can watch until the next game begins, though!')
-			} else {
+	var optns = [
+					{name:'3D', scale: 1,support:supported('webgl'), use: WebGLForFunsies, IM:ThreeDSpace, img: '3d.jpg',
+						details: 'Browsers that support the experimental WebGL API with hardware acceleration are in for a treat with this.'},
+					{name:'Vectors', scale: 1.5, support:supported('svg'), use: SVGisCoolforHavingaDOM, img: 'svg.jpg', 
+						details: 'If your browser supports SVG, then this is going to look smoother and use less CPU than canvas.'},
+					{name:'Canvas', scale: 1.5, support:supported('canvas'), use: CanvasIsOddlyPopular, img: 'canvas.jpg', 
+						details: 'If your browser can use the 2D Canvas API, then you\'re in luck!. And your CPU may double as a toaster!'}
+				];
+	
+	var choices = d3.select('#view').selectAll('.method')
+		.data(optns).enter()
+		.append('div').classed('method',true).classed('pickable',function(d){ return d.support; });
+	
+	choices.append('h3').html(function(d){ return d.name; });
+	choices.append('img').attr('src',function(d){ return d.img; }).attr('alt',function(d){ return d.name; });
+	choices.append('p').html(function(d){ return d.details; });
+	
+	choices.on('click',function(d,i){
+		if (d.support){
+			gameGO(d);
+			choices.on('click',null);
+		}	
+	});
+
+	
+
+	function gameGO(d){
+			scale = d.scale;
+			
+			d3.select('#game').classed('off',false);
+			d3.select('#view').classed('off',true);
+			d3.select('body').attr('id','gameOn');
+			
+			Render = Renderer(scale,d.use);
+			Render.init(Engine.init());
+			Input = InputManager(d.IM);
+			if (d.name=='3D'){
+				Input.playerElements(Render.getPlayers());
+			}
+			
+			
+			Net = Network();
+			Net.on('w',function(d){ //welcome
+				if (d=='f'){
+					alert('This game is currently full! You can watch until the next game begins, though!')
+				} else {
+					Input.onPickPlayer(pickHandler);
+				}
+			})
+			.on('s',function(d){ //state
+				Engine.setState(d);
+				Engine.apply(Input.getInputs());
+			})
+			.on('b',function(d){ //ball action (not movement)
+			
+			});		
+			if (!Net.connected){
 				Input.onPickPlayer(pickHandler);
 			}
-		})
-		.on('s',function(d){ //state
-			Engine.setState(d);
-			Engine.apply(Input.getInputs());
-		})
-		.on('b',function(d){ //ball action (not movement)
-		
-		});
-		
-		
-	if (!Net.connected){
-		Input.onPickPlayer(pickHandler);
+			
+			
+			Input.onChange(function(velo){
+				Net.send('v',velo)
+				Engine.apply(velo);
+			});
+			
+			stats = new Stats();
+			stats.getDomElement().style.position = 'absolute';
+			stats.getDomElement().style.left = '0px';
+			stats.getDomElement().style.top = '0px';	
+			document.body.appendChild( stats.getDomElement() );
+			
+			Controller.start();	
 	}
-	Input.onChange(function(velo){
-		Net.send('v',velo)
-		Engine.apply(velo);
-	})
-	
 	
 	
 	function pickHandler(x,y){
@@ -87,12 +123,3 @@ var Controller = function(){
 		}
 	}
 }();
-
-var stats = new Stats();
-// Align top-left
-stats.getDomElement().style.position = 'absolute';
-stats.getDomElement().style.left = '0px';
-stats.getDomElement().style.top = '0px';	
-document.body.appendChild( stats.getDomElement() );
-
-Controller.start();	

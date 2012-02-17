@@ -46,11 +46,112 @@
 			border-collapse: collapse;
 			border-spacing: 0;
 		}
-		
-		#game,body,html {
+
+
+
+		/*page stuff*/
+		#gameOn #game, #gameOn{
 			height: 100%;
 			background-color: #bfd1e5;
 		}
+		
+		.off {
+			display: none !important;
+		}
+		
+		
+		body {
+			background-color: #fbfbfb;
+			color: #444;
+		}
+		
+		h1 {
+			text-align: center;
+			margin-top: 60px;
+			font-size: 43px;
+			padding-bottom: 12px;
+		}
+		p {
+			font-size: 18px;
+		}
+		#view {
+			text-align: center;
+		}
+		#view .discl {
+			padding-top: 4px;
+			font-size: 12px;
+		}
+		
+		.method {
+			cursor: pointer;
+			width: 26%;
+			float: left;
+			margin: 3%;
+			background-color: #ddd;
+			position: relative;
+			
+			border: 1px solid #999;
+			padding: 10px;
+			min-height: 100px;
+			
+			color: #222;
+			
+			-moz-border-radius: 10px;
+			-webkit-border-radius: 10px;
+			border-radius: 10px;
+			
+			
+			-moz-box-sizing: border-box;
+			  -webkit-box-sizing: border-box;
+			  box-sizing: border-box;
+			  
+			  opacity: 0.4;
+			  -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=40)";
+			 filter: alpha(opacity=40);
+			
+		}
+		.method.pickable {
+			opacity: 1;
+			-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=100)";
+			filter: alpha(opacity=100);
+		}
+		.method h3 {
+			text-align: center;
+			font-weight: bold;
+			padding-bottom: 12px;
+		}
+		.method p {
+			text-align: left;
+			font-size: 15px;
+			line-height: 1.1;
+			text-indent: 1em;
+		}
+		.method img {
+			width: 100%;
+			padding-bottom: 12px;
+		}
+		
+		 @media screen and (max-width: 960px){
+		 	.method {
+		 		padding: 5px;
+		 		width: 26%;
+		 		margin: 3%;
+		 	}
+		 	.method p {
+		 		font-size: 14px;
+		 	}
+		 }
+		
+		 @media screen and (max-width: 600px){
+		 	.method {
+		 		padding: 5px;
+		 		width: 40%;
+		 		margin: 2%;
+		 	}
+		 	.method p {
+		 		font-size: 14px;
+		 	}
+		 }
 		
 		
 		
@@ -77,6 +178,7 @@
 		#pitch {
 			z-index: 1;
 		}
+		
 		
 		
 		

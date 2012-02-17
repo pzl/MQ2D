@@ -3,13 +3,11 @@ var Renderer = function(scale,override){
 	if (typeof scale == 'undefined'){
 		scale = 1;
 	}
-	var e = document.createElement('div');
-	e.innerHTML = '<svg></svg>';
-	var svgTest = (e.firstChild && "namespaceURI" in e.firstChild && e.firstChild.namespaceURI == 'http://www.w3.org/2000/svg');
+
 	
 	if (typeof override =='function'){
 		manager=override(scale);
-	} else if (svgTest){
+	} else if (supported('svg')){
 		manager=SVGisCoolforHavingaDOM(scale);
 	} else {
 		manager=CanvasIsOddlyPopular(scale);
@@ -27,3 +25,24 @@ var Renderer = function(scale,override){
 		getPlayers: function(){ if (typeof manager.getPlayers == 'function') { return manager.getPlayers(); } }
 	}
 };
+function supported(tech){
+	tech = tech.toLowerCase();
+	if (tech == 'svg'){
+		var e = document.createElement('div');
+		e.innerHTML = '<svg></svg>';
+		return !!(e.firstChild && "namespaceURI" in e.firstChild && e.firstChild.namespaceURI == 'http://www.w3.org/2000/svg');
+	} else if (tech == 'canvas'){
+		var elem = document.createElement('canvas');
+        return !!(elem.getContext && elem.getContext('2d'));
+	} else if (tech=='webgl'){
+		try {
+            var canvas = document.createElement('canvas'),
+                ret;
+            ret = !!(window.WebGLRenderingContext && (canvas.getContext('experimental-webgl') || canvas.getContext('webgl')));
+            canvas = undefined;
+        } catch (e){
+            ret = false;
+        }
+        return ret;
+	}
+}
