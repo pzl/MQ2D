@@ -12,6 +12,8 @@ var WebGLForFunsies = function(scale){
 		renderer = new THREE.WebGLRenderer({antialias:true}),
 		camera = new THREE.PerspectiveCamera(angle,aspect,near,far),
 		scene = new THREE.Scene(),
+		clock = new THREE.Clock(),
+		me,
 		balls = [],
 		players=[];
 	
@@ -20,6 +22,7 @@ var WebGLForFunsies = function(scale){
 	renderer.domElement.id='THREE';
 	container.appendChild(renderer.domElement);
 	scene.add(camera);
+	
 	
 	var debugaxis = function(axisLength){
 	    //Shorten the vertex function
@@ -48,7 +51,7 @@ var WebGLForFunsies = function(scale){
 			field = start.field;
 			var rad = field.R[0],
 				posMap = {seeker:0xffd700,chaser:0xffffff,beater:0x000000,keeper:0x00ff00}
-				fieldMat = new THREE.MeshLambertMaterial({color: 0x6ac06e, ambient: 0xeeeeee}),
+				fieldMat = new THREE.MeshBasicMaterial({color: 0x76943c, ambient: 0xeeeeee}),
 				groundMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, ambient: 0x333333}),
 				biglineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 5}),
 				medlineMat = new THREE.LineBasicMaterial({color: 0xffffff, linewidth: 2}),
@@ -64,12 +67,12 @@ var WebGLForFunsies = function(scale){
 				headbandGeo = new THREE.CylinderGeometry(field.R[0]*0.8,field.R[0]*0.9,1,16,8,true),
 				wf = new THREE.MeshBasicMaterial( { color: 0x222222, wireframe: true, transparent: true, opacity: 0.1 } ),
 				ballMat = [new THREE.MeshLambertMaterial({ color: 0xffffff, ambient: 0xcccccc }),
-						   new THREE.MeshLambertMaterial({ color: 0xee7777, ambient: 0xcccccc }),
+						   new THREE.MeshLambertMaterial({ color: 0xff5555, ambient: 0xaaaaaa }),
 						   new THREE.MeshLambertMaterial({ color: 0xffd700, ambient: 0xffffff })],
 				ballGeo = [new THREE.SphereGeometry(field.R[1],8,8),
 						   new THREE.SphereGeometry(field.R[2],8,8),
 						   new THREE.SphereGeometry(field.R[3],8,8)],
-				lights = [new THREE.DirectionalLight(0XFFFFFF,0.6),new THREE.DirectionalLight(0XFAB65A)],
+				lights = [new THREE.DirectionalLight(0XFFFFFF,0.9),new THREE.DirectionalLight(0XFFC67A,1.2)],
 				plane = new THREE.Mesh(new THREE.PlaneGeometry(500,1200,32,32),groundMat);
 				
 				
@@ -152,13 +155,10 @@ var WebGLForFunsies = function(scale){
 				players[i] = new THREE.Object3D();
 				
 				players[i].add(new THREE.Mesh(playerGeo, new THREE.MeshLambertMaterial({color: t, ambient: 0xffffff, transparent: true, opacity: 1})));
-				players[i].add(new THREE.Mesh(headbandGeo, new THREE.MeshBasicMaterial({ color: posMap[start.positions[i%7]]})));
+				players[i].add(new THREE.Mesh(headbandGeo, new THREE.MeshLambertMaterial({ color: posMap[start.positions[i%7]], ambient: 0xffffff, reflectivity: 1, refractionRatio: 1 })));
 				players[i].children[1].position.set(0,field.R[0]*0.55,0);
 				players[i].children[1].doubleSided=true;
-				
-				/*players[i] = new THREE.SceneUtils.createMultiMaterialObject(playerGeo, 
-												[new THREE.MeshLambertMaterial({color: t, ambient: 0xffffff, transparent: true, opacity: 1}),
-												 new THREE.MeshBasicMaterial({color: posMap[start.positions[i%7]], wireframe: true, transparent:true, opacity: 0.25})]);*/
+
 				players[i].position.set(-1*start.state.p[i][1], rad, start.state.p[i][0]);
 				players[i].defColor = t;
 				scene.add(players[i]);
@@ -211,6 +211,7 @@ var WebGLForFunsies = function(scale){
 			lights[1].position.set(80,400,220);
 			scene.add(lights[0]);
 			scene.add(lights[1]);
+			scene.add(new THREE.AmbientLight(0x3d3d3d));
 			scene.add(plane);
 			scene.add(midline);
 			scene.add(klines[0]);
@@ -230,33 +231,44 @@ var WebGLForFunsies = function(scale){
 			renderer.render(scene,camera);
 		},
 		display: function(state){
+			var delta = clock.getDelta();
+		
 			for (var i=0, l=state.p.length; i<l; i++){
 				players[i].position.x = -1*state.p[i][1];
 				players[i].position.z = state.p[i][0];
+				if (i==me){
+					camera.position.set(players[i].position.x,players[i].position.y+1.2,players[i].position.z);
+				}
 
-								
 				if (state.p[i][3]){ //out
 					players[i].children[0].material.opacity=0.6;
+					if (state.p[i][2]){
+						players[i].children[0].material.wireframe=false;
+					}
 				} else if (!state.p[i][2]){ //not controlled
-					//players[i].children[0].material.color.setHex(0xdddddd);
 					players[i].children[0].material.wireframe=true;
 				} else {
-					players[i].children[0].material.opacity=1;
+					if (i==me){
+						players[i].children[0].material.opacity=0;
+					} else {
+						players[i].children[0].material.opacity=1;
+					}
 					players[i].children[0].material.wireframe=false;
-					//players[i].children[0].material.color.setHex(players[i].defColor);
 				}
 			}
 			for (var i=0, l=state.b.length; i<l; i++){
-				if (i==0){
-					//console.log(state.b[i]);
-				}
+				balls[i].children[0].material.opacity=1;
 				balls[i].position.set(-1*state.b[i][1],field.R[ballMap[i]+1],state.b[i][0])
-				if (!!~state.b[i][2] && i != 4){
-					balls[i].position.y += 1.4;
-				} else if (!state.b[i][3] && i!= 4){
+				if (!!~state.b[i][2] && i != 4){ //being held
+					balls[i].position.y += 1.2;
+					if (state.b[i][2] == me && i==0){
+						balls[i].position.y -= 1.2;
+					}
+				} else if (!state.b[i][3] && i!= 4){ //live/in the air
 					balls[i].position.y+=8;
 				}
 			}
+			
 			renderer.render(scene,camera);
 
 		},
@@ -266,6 +278,15 @@ var WebGLForFunsies = function(scale){
 		},
 		getPlayers: function(){
 			return players;
+		},
+		self: function(i){
+			me=i;
+			camera.position.set(players[i].position.x,players[i].position.y+1.2,players[i].position.z);
+			if (i<7){
+				camera.rotation.set(0,Math.PI,0);
+			} else {
+				camera.rotation.set(0,0,0);
+			}
 		}
 	}
 	return API;

@@ -187,8 +187,8 @@ var Engine = (function(){
 					state.p[i].loc[1] += speed*factor*state.p[i].velo[1];
 					
 					//round
-					state.p[i].loc[0]= (~~(state.p[i].loc[0]*10))/10;
-					state.p[i].loc[1]= (~~(state.p[i].loc[1]*10))/10;
+					state.p[i].loc[0]= (~~(state.p[i].loc[0]*10+0.5))/10;
+					state.p[i].loc[1]= (~~(state.p[i].loc[1]*10+0.5))/10;
 					
 					if (state.p[i].hold < 6){
 						state.b[state.p[i].hold].velo = [state.p[i].velo[0],state.p[i].velo[1]];
@@ -210,7 +210,14 @@ var Engine = (function(){
 			return this.getState();
 		},
 		setState: function(newState){
-			state = expand(newState);
+			var temp = expand(newState);
+			if (typeof self == 'number'){ //smooth self movement correction
+				if (Math.abs(temp.p[self].loc[0]-state.p[self].loc[0]) < 2.2 && Math.abs(temp.p[self].loc[1]-state.p[self].loc[1]) < 2.2){
+					temp.p[self].loc[0] += (state.p[self].loc[0] - temp.p[self].loc[0])/2;
+					temp.p[self].loc[1] += (state.p[self].loc[1] - temp.p[self].loc[1])/2
+				}
+			}
+			state = temp;
 			return this.getState();
 		},
 		getState: function(){

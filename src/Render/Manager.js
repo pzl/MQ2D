@@ -22,7 +22,8 @@ var Renderer = function(scale,override){
 		destroy: function(){ return manager.destroy(); },
 		//Optional
 		out: function(i){ if (typeof manager.out == 'function'){ return manager.out(i); } },
-		getPlayers: function(){ if (typeof manager.getPlayers == 'function') { return manager.getPlayers(); } }
+		getPlayers: function(){ if (typeof manager.getPlayers == 'function') { return manager.getPlayers(); } },
+		self: function(i){ if (typeof manager.self == 'function') { return manager.self(i); } }
 	}
 };
 function supported(tech){

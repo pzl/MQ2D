@@ -248,8 +248,8 @@ var Engine = (function(){
 				player.loc[1] += speed*factor*player.velo[1];
 				
 				//round
-				player.loc[0]= (~~(player.loc[0]*10))/10;
-				player.loc[1]= (~~(player.loc[1]*10))/10;
+				player.loc[0]= (~~(player.loc[0]*10+0.5))/10;
+				player.loc[1]= (~~(player.loc[1]*10+0.5))/10;
 				
 				
 				if (!player.out && player.controlled){ //ignore balls if you're out or a ghost

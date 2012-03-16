@@ -49,29 +49,24 @@ var Controller = function(){
 			
 			
 			Net = Network();
-			Net.on('w',function(d){ //welcome
-				if (d=='f'){
-					alert('This game is currently full! You can watch until the next game begins, though!')
-				} else {
-					Input.onPickPlayer(pickHandler);
-				}
-			})
-			.on('s',function(d){ //state
-				Engine.setState(d);
-				Engine.apply(Input.getInputs());
-			})
-			.on('b',function(d){ //ball action (not movement)
-			
-			});		
-			if (!Net.connected){
+			if (Net.connected){
+				Net.on('w',function(d){ //welcome
+					if (d=='f'){
+						alert('This game is currently full! You can watch until the next game begins, though!')
+					} else {
+						Input.onPickPlayer(pickHandler);
+					}
+				})
+				.on('s',function(d){ //state
+					Engine.setState(d);
+					Engine.apply(Input.getInputs());
+				})
+				.on('b',function(d){ //ball action (not movement)
+				
+				});	
+			} else {
 				Input.onPickPlayer(pickHandler);
 			}
-			
-			
-			Input.onChange(function(velo){
-				Net.send('v',velo)
-				Engine.apply(velo);
-			});
 			
 			stats = new Stats();
 			stats.getDomElement().style.position = 'absolute';
@@ -90,20 +85,27 @@ var Controller = function(){
 				Net.send('claim',chosen);
 				Net.on('ca',function(d){
 					if (d==1){
-						Engine.assign(chosen);
-						Input.onPickPlayer(function(){});
+						successPick(chosen);
 					} else if (d==0){
 						alert('Woops! that position is taken, please pick again');
 					} else {
 						alert('Sorry! This game is full now, but you can watch this game until the next begins, or a player drops out');
-						Input.onPickPlayer(function(){});
+						Input.onPickPlayer(null);
 					}
 				})
 			} else { //play by yourself for funsies
-				Input.onPickPlayer(function(){});
-				Engine.assign(chosen);
+				successPick(chosen);
 			}
 		}
+	}
+	function successPick(chosen){
+		Engine.assign(chosen);
+		Render.self(chosen);
+		Input.onPickPlayer(null);	
+		Input.onChange(function(velo){
+			Net.send('v',velo)
+			Engine.apply(velo);
+		});
 	}
 	var past, dt;
 	function loop(t){

@@ -4,36 +4,49 @@ var ThreeDSpace = function(){
 				wasd: { left: 65, up: 87, right: 68, down: 83}, 
 				space: 32, 1: 49, 2: 50, 3:51, 4:52, 5:53, 6:54, 7:55 
 			},
-		right=0,
-		left=0,
-		up=0,
-		down=0,
+		x=0,
+		y=0,
 		API = {},
 		players = [],
 		shootCB,
-		changeCB;
+		changeCB,
+		cam;
+	
+	
+	for (var i=0, l=window.scene.children.length; i<l; i++){
+		if (window.scene.children[i].hasOwnProperty('near')){
+			cam = window.scene.children[i];
+			break;
+		}
+	}
+	
 	d3.select(document).on('keydown', function(){
 		var e = d3.event,
-			prevent=false;
+			prevent=false,
+			vector = [Math.cos(cam.rotation.y),Math.sin(cam.rotation.y)];
 	    switch (e.keyCode){
 	    	case key.arrow.left:
 	    	case key.wasd.left:
-	    		left=1;
+	    		x=Math.cos(cam.rotation.y-Math.PI/2);
+	    		y=-1*Math.sin(cam.rotation.y-Math.PI/2);
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.right:
 	    	case key.wasd.right:
-	    		right=1;
+	    		x=-1*Math.cos(cam.rotation.y-Math.PI/2);
+	    		y=Math.sin(cam.rotation.y-Math.PI/2);
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.up:
 	    	case key.wasd.up:
-	    		up=1;
+	    		x=-1*vector[0];
+	    		y=vector[1];
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.down:
 	    	case key.wasd.down:
-	    		down=1;
+	    		x=vector[0];
+	    		y=-1*vector[1];
 	    		prevent=true;
 	    		break;
 	    	case key.space:
@@ -44,7 +57,7 @@ var ThreeDSpace = function(){
 	    		break;
 	    }
 	    if (prevent){
-	    	changeCB([right-left,down-up]);
+	    	changeCB([x,y]);
 	   		e.preventDefault();
 	   	}
 	});
@@ -54,35 +67,33 @@ var ThreeDSpace = function(){
 	    switch (e.keyCode){
 	    	case key.arrow.left:
 	    	case key.wasd.left:
-	    		left=0;
-	    		prevent=true;
-	    		break;
 	    	case key.arrow.right:
 	    	case key.wasd.right:
-	    		right=0;
-	    		prevent=true;
-	    		break;
 	    	case key.arrow.up:
 	    	case key.wasd.up:
-	    		up=0;
-	    		prevent=true;
-	    		break;
 	    	case key.arrow.down:
 	    	case key.wasd.down:
-	    		down=0;
+	    		x=0;
+	    		y=0;
 	    		prevent=true;
 	    		break;
 	    }
 	    if (prevent){
-	    	changeCB([right-left,down-up]);
+	    	changeCB([x,y]);
 	   		e.preventDefault();
 	   	}
 	});
 	API = {
 		getInputs: function(){
-			return [right-left,down-up];
+			return [x,y];
 		},
 		onChange: function(cb){
+			d3.select(document).on('mousemove',function(){
+				var dist = ((window.innerWidth/2)-d3.event.clientX)/(window.innerWidth/2),
+					sensitivity = 2.5;
+				
+				cam.rotation.y += dist*sensitivity*Math.PI/180;		
+			});
 			changeCB = cb;
 		},
 		playerElements: function(el){
@@ -91,15 +102,7 @@ var ThreeDSpace = function(){
 			}
 		},
 		onPickPlayer: function(cb){
-			var projector = new THREE.Projector(),
-				cam;
-			for (var i=0, l=window.scene.children.length; i<l; i++){
-				if (window.scene.children[i].hasOwnProperty('near')){
-					cam = window.scene.children[i];
-					break;
-				}
-			}
-			
+			var projector = new THREE.Projector();
 			d3.select(document).on('mousedown',function(){
 				var vector = new THREE.Vector3(( d3.event.clientX / window.innerWidth ) * 2 - 1, - ( d3.event.clientY / window.innerHeight ) * 2 + 1, 0.5 );
 				projector.unprojectVector(vector,cam);
