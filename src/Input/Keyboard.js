@@ -11,28 +11,41 @@ var Keyboard = function(){
 		players,
 		API = {},
 		shootCB,
-		changeCB;
+		changeCB,
+		angleCB,
+		angle = 0,
+		angleHandle;
+	
+	
+	function angleChange(direction){
+		angle = (angle+(direction*2))%360;
+		
+		if (angle < 0){
+			angle += 360;
+		}
+		
+		angleCB(angle);
+		
+	}
+	
+	
 	d3.select(document).on('keydown', function(){
 		var e = d3.event,
 			prevent=false;
 	    switch (e.keyCode){
 	    	case key.arrow.left:
-	    	case key.wasd.left:
 	    		left=1;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.right:
-	    	case key.wasd.right:
 	    		right=1;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.up:
-	    	case key.wasd.up:
 	    		up=1;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.down:
-	    	case key.wasd.down:
 	    		down=1;
 	    		prevent=true;
 	    		break;
@@ -42,6 +55,15 @@ var Keyboard = function(){
 	    		}
 	    		prevent=true;
 	    		break;
+	    	case key.wasd.up:
+	    		clearInterval(angleHandle);
+	    		angleHandle = setInterval(function(){ angleChange(-1);  }, 16);
+	    		break;
+	    	case key.wasd.down:
+	    		clearInterval(angleHandle);
+	    		angleHandle = setInterval(function(){ angleChange(1); }, 16);
+	    		break;
+	    		
 	    }
 	    if (prevent){
 	    	changeCB([right-left,down-up]);
@@ -53,24 +75,24 @@ var Keyboard = function(){
 			prevent=false;
 	    switch (e.keyCode){
 	    	case key.arrow.left:
-	    	case key.wasd.left:
 	    		left=0;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.right:
-	    	case key.wasd.right:
 	    		right=0;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.up:
-	    	case key.wasd.up:
 	    		up=0;
 	    		prevent=true;
 	    		break;
 	    	case key.arrow.down:
-	    	case key.wasd.down:
 	    		down=0;
 	    		prevent=true;
+	    		break;
+	    	case key.wasd.up:
+	    	case key.wasd.down:
+	    		clearInterval(angleHandle);
 	    		break;
 	    }
 	    if (prevent){
@@ -89,7 +111,6 @@ var Keyboard = function(){
 			players = el;
 		},
 		onPickPlayer: function(cb){
-			//var entity = players || document;
 			d3.select(document).on('mousedown',function(){
 				if (typeof cb == 'function'){
 					cb(d3.event.x,d3.event.y);
@@ -97,8 +118,11 @@ var Keyboard = function(){
 				d3.event.preventDefault();
 			})	
 		},
-		shoot: function(cb){
+		onShoot: function(cb){
 			shootCB = cb;
+		},
+		newAngle: function(cb){
+			angleCB = cb;
 		}
 	}
 	return API;

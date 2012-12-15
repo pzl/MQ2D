@@ -249,6 +249,12 @@ var CanvasIsOddlyPopular = function(scale){
 		destroy: function(){
 			container.removeChild(canvas);
 			container.removeChild(buffer);
+		},
+		out: function(idx){
+			
+		},
+		angleChange: function(angle){
+			
 		}
 	}	
 };

@@ -178,6 +178,11 @@ var Engine = (function(){
 				}
 			}
 		},
+		toss: function(v){
+			if (typeof self === 'number' && state.p[self].hold < 6){				
+				state.b[state.p[self].hold].velo = input;
+			}
+		},
 		update: function(dt){
 			var factor = dt/(1000/60) || 1;
 			for (var i=0, l=state.p.length; i<l; i++){

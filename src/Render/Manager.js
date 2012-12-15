@@ -21,6 +21,7 @@ var Renderer = function(scale,override){
 		display: function(state){ return manager.display(state); },
 		destroy: function(){ return manager.destroy(); },
 		//Optional
+		angleChange: function(angle){ if (typeof manager.angleChange == 'function'){ return manager.angleChange(angle); } },
 		out: function(i){ if (typeof manager.out == 'function'){ return manager.out(i); } },
 		getPlayers: function(){ if (typeof manager.getPlayers == 'function') { return manager.getPlayers(); } },
 		self: function(i){ if (typeof manager.self == 'function') { return manager.self(i); } }

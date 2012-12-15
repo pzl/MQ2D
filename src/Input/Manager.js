@@ -14,6 +14,7 @@ var InputManager = function(override){
 		onShoot: function(cb){ return manager.onShoot(cb); },
 		onPickPlayer: function(cb,scale) { return manager.onPickPlayer(cb,scale); },
 		//Optional
-		playerElements: function(el){ if (typeof manager.playerElements == 'function'){ return manager.playerElements(el); } }
+		playerElements: function(el){ if (typeof manager.playerElements == 'function'){ return manager.playerElements(el); } },
+		newAngle: function(cb){ if (typeof manager.newAngle == 'function'){ return manager.newAngle(cb); } }
 	}
 };

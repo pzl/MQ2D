@@ -45,6 +45,8 @@ var Controller = function(){
 			Input = InputManager(d.IM);
 			if (d.name=='3D'){
 				Input.playerElements(Render.getPlayers());
+			} else {
+				Input.newAngle(Render.angleChange);
 			}
 			
 			
@@ -106,6 +108,11 @@ var Controller = function(){
 			Net.send('v',velo)
 			Engine.apply(velo);
 		});
+		Input.onShoot(function(velo){
+			Net.send('t',velo);
+			Engine.toss(velo);
+		});
+		
 	}
 	var past, dt;
 	function loop(t){

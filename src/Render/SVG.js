@@ -132,6 +132,23 @@ var SVGisCoolforHavingaDOM = function(scale){
 					.attr('r',R[0])
 					.attr('cx',function(d,i){ return d[0] })
 					.attr('cy',function(d,i){ return d[1] });
+			
+			var arrow = game.append('g')
+							.attr('id','arrow')
+							.attr('transform','translate(50,50)');
+			
+			
+			
+			
+			arrow.append('line')
+					.attr('x1',10)
+					.attr('x2',15)
+					.attr('y1',0)
+					.attr('y2',0)
+			arrow.append('polygon')
+					.attr('points','18,10 15,7 15,13')
+					.attr('transform','translate(0,-10)')
+					.attr('fill','white')
 
 		},
 		display: function(state){
@@ -158,6 +175,9 @@ var SVGisCoolforHavingaDOM = function(scale){
 			var player = playG.selectAll('.player').filter(function(d,i){ return i==idx; }).classed('out',true);
 			var flashy = setInterval(function(){ player.classed('flash',!player.classed('flash')); },100);
 			setTimeout(function(){ clearInterval(flashy); player.classed('flash',false); },1000);
+		},
+		angleChange: function(angle){
+			game.select('#arrow').attr('transform','rotate('+angle+',50,50)');
 		}
 	}
 };
